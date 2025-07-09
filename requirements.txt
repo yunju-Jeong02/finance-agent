@@ -1,16 +1,33 @@
+# Core Framework
 langgraph==0.2.16
 langchain==0.2.16
 langchain-core==0.2.38
 langchain-openai==0.1.23
-yfinance==0.2.65
-mysql-connector-python==8.4.0
-python-dotenv==1.0.1
+
+# Data Processing
 pandas==2.2.2
 numpy==1.26.4
-pydantic==2.7.4
-typing-extensions==4.12.2
+yfinance==0.2.65
+
+# Database
+mysql-connector-python==8.4.0
+pymysql==1.4.6
+sqlalchemy==2.0.23
+
+# API & Web
 fastapi==0.104.1
 uvicorn==0.24.0
 requests==2.31.0
+
+# Utilities
+python-dotenv==1.0.1
+pydantic==2.7.4
+typing-extensions==4.12.2
 tqdm==4.67.1
-pymysql==1.4.6
+
+# Scheduling (for daily updates)
+schedule==1.2.0
+
+# Development & Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1

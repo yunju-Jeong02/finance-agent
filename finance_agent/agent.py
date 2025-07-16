@@ -8,7 +8,6 @@ from langgraph.graph import StateGraph, END
 import uuid
 
 from finance_agent.nodes.input_node import InputNode
-from finance_agent.nodes.clarification_node import ClarificationNode
 from finance_agent.nodes.sql_generator_node import SqlGeneratorNode
 from finance_agent.nodes.sql_refiner_node import SqlRefinerNode
 from finance_agent.nodes.output_formatter_node import OutputFormatterNode
@@ -20,6 +19,7 @@ class GraphState(TypedDict):
     session_id: str
     clarification_needed: bool
     clarification_question: str
+    clarification_count: int
     needs_user_input: bool
     sql_query: str
     sql_attempts: int
@@ -35,7 +35,6 @@ class FinanceAgent:
     def __init__(self):
         # Initialize nodes
         self.input_node = InputNode()
-        self.clarification_node = ClarificationNode()
         self.sql_generator_node = SqlGeneratorNode()
         self.sql_refiner_node = SqlRefinerNode()
         self.output_formatter_node = OutputFormatterNode()
@@ -49,7 +48,6 @@ class FinanceAgent:
         
         # Add nodes
         workflow.add_node("input_handler", self.input_handler)
-        workflow.add_node("clarification_handler", self.clarification_handler)
         workflow.add_node("sql_generator", self.sql_generator)
         workflow.add_node("sql_refiner", self.sql_refiner)
         workflow.add_node("output_formatter", self.output_formatter)
@@ -57,18 +55,15 @@ class FinanceAgent:
         # Set entry point
         workflow.set_entry_point("input_handler")
         
-        # Add edges
         workflow.add_conditional_edges(
             "input_handler",
             self.route_after_input,
             {
-                "clarification": "clarification_handler",
+                "end": END,  # clarification_needed일 때 바로 END
                 "sql_generation": "sql_generator"
             }
         )
-        
-        workflow.add_edge("clarification_handler", END)
-        
+                
         workflow.add_conditional_edges(
             "sql_generator",
             self.route_after_sql_generation,
@@ -112,9 +107,20 @@ class FinanceAgent:
         return self.output_formatter_node.process(state)
     
     def route_after_input(self, state: GraphState) -> str:
-        """Route after input processing"""
         if state["clarification_needed"]:
-            return "clarification"
+            # clarification 시도 횟수 2회 미만만 되묻기
+            if state.get("clarification_count", 0) < 2:
+                state["final_output"] = state["clarification_question"]
+                state["is_complete"] = False
+                state["needs_user_input"] = True
+                state["clarification_count"] = state.get("clarification_count", 0) + 1
+                return "end"
+            else:
+                # 2회 이상이면 중단/안내 메시지
+                state["final_output"] = "정보가 부족하여 질문을 이해하지 못했습니다. 더 구체적으로 질문해 주세요."
+                state["is_complete"] = True
+                state["needs_user_input"] = False
+                return "end"
         else:
             return "sql_generation"
     
@@ -172,12 +178,15 @@ class FinanceAgent:
                 "sql_query": "",
                 "sql_attempts": 0
             }
-    
-    def handle_clarification_response(self, original_query: str, clarification: str, session_id: str) -> Dict:
-        """Handle user's clarification response"""
-        combined_query = f"{original_query} {clarification}"
-        return self.process_query(combined_query, session_id)
 
+    
+    def handle_clarification_response(self, original_query, clarification, session_id, clarification_count=0):
+        combined_query = f"사용자 질문: {original_query}, 추가 정보: {clarification}"
+        return self.process_query(
+            combined_query, 
+            session_id=session_id,
+            clarification_count=clarification_count
+        )
 
 class FinanceAgentInterface:
     """Interface for graph framework"""
@@ -214,7 +223,7 @@ class FinanceAgentInterface:
                     clarification = input("🤖: 추가 정보를 입력해주세요: ").strip()
                     if clarification:
                         clarified_result = self.framework.handle_clarification_response(
-                            user_input, clarification, self.current_session_id
+                            user_input, clarification, self.current_session_id, clarification_count=result.get("clarification_count", 0)
                         )
                         print(f"🤖: {clarified_result['response']}")
                 

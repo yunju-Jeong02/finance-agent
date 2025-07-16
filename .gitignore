@@ -1,5 +1,4 @@
 /api
-/config/.env
 scripts/deploy_ngrok.py
 scripts/run_api.py
 

@@ -1,14 +1,16 @@
 """
 SQL Generator Node
-Generates SQL queries from user input
+# SQL 생성
 """
 
 from typing import Dict
-from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 import re
 from config.config import Config
+
 from finance_agent.database import DatabaseManager
+from finance_agent.llm import LLM
+from finance_agent.prompts import sql_generation_prompt as prompt
 
 
 class SqlGeneratorNode:
@@ -16,47 +18,20 @@ class SqlGeneratorNode:
     
     def __init__(self):
         self.config = Config()
-        self.llm = ChatOpenAI(
-            temperature=0.1,
-            model="gpt-4o-mini",
-            openai_api_key=self.config.OPENAI_API_KEY
-        )
+        self.llm = LLM()
         self.db_manager = DatabaseManager()
     
     def process(self, state: Dict) -> Dict:
         """Generate SQL query from user input"""
         user_query = state["user_query"]
-        
-        # Get latest available date
         latest_date = self._get_latest_available_date()
         
-        prompt = ChatPromptTemplate.from_template("""
-        다음 한국어 질문을 krx_stockprice 테이블에 대한 SQL 쿼리로 변환해주세요.
-        
-        질문: {query}
-        
-        규칙:
-        1. 날짜가 없으면 최신 날짜 {latest_date} 사용
-        2. KOSPI: ticker LIKE '%.KS'
-        3. KOSDAQ: ticker LIKE '%.KQ'
-        4. 가장 비싼: ORDER BY Close DESC
-        5. 상승: price_change_pct > 0
-        6. 하락: price_change_pct < 0
-        7. 거래량: Volume 컬럼
-        8. 회사명: company_name 컬럼
-        9. SELECT 문만 사용
-        10. 결과만 반환 (설명 없이)
-        
-        SQL:
-        """)
-        
         try:
-            response = self.llm.invoke(prompt.format(
-                query=user_query,
-                latest_date=latest_date
-            ))
-            
-            sql_query = self._clean_sql(response.content)
+            prompt_text = prompt.format(user_query=user_query, latest_date=latest_date)
+            response = self.llm.invoke(prompt_text)
+            # LLM 응답이 객체면 .content, 문자열이면 그대로
+            llm_content = response.content if hasattr(response, "content") else str(response)
+            sql_query = self._clean_sql(llm_content)
             state["sql_query"] = sql_query
             state["sql_attempts"] = 1
             
@@ -68,7 +43,6 @@ class SqlGeneratorNode:
             except Exception as e:
                 state["sql_error"] = str(e)
                 state["query_results"] = []
-                
         except Exception as e:
             state["sql_error"] = f"SQL 생성 오류: {str(e)}"
             state["sql_query"] = ""
@@ -78,9 +52,10 @@ class SqlGeneratorNode:
     
     def _clean_sql(self, sql_text: str) -> str:
         """Clean SQL query text"""
+        # '''sql, ```sql, ``` 등 다양한 포맷 모두 제거
         sql_query = sql_text.strip()
-        sql_query = re.sub(r'```sql\n?', '', sql_query)
-        sql_query = re.sub(r'```\n?', '', sql_query)
+        sql_query = re.sub(r"(```sql|'''sql)", "", sql_query, flags=re.IGNORECASE)
+        sql_query = re.sub(r"(```|''')", "", sql_query)
         return sql_query.strip()
     
     def _get_latest_available_date(self) -> str:
@@ -88,5 +63,5 @@ class SqlGeneratorNode:
         try:
             dates = self.db_manager.get_available_dates(1)
             return dates[0] if dates else "2025-07-09"
-        except:
+        except Exception:
             return "2025-07-09"

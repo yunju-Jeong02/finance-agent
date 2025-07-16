@@ -102,7 +102,7 @@ class DailyStockUpdater:
     def get_latest_date_in_db(self) -> Optional[str]:
         """데이터베이스에서 최신 날짜 조회"""
         try:
-            query = "SELECT MAX(Date) as latest_date FROM krx_stockprice"
+            query = "SELECT max(date) as latest_date FROM krx_stockprice"
             result = pd.read_sql(query, self.engine)
             latest_date = result['latest_date'].iloc[0]
             
@@ -132,16 +132,17 @@ class DailyStockUpdater:
             
             # 컬럼 이름 정리
             df.rename(columns={
-                'Open': 'Open',
-                'High': 'High', 
-                'Low': 'Low',
-                'Close': 'Close',
-                'Volume': 'Volume',
-                'Adj Close': 'Adj_Close'
+                'Date': 'date',
+                'Open': 'open',
+                'High': 'high', 
+                'Low': 'low',
+                'close': 'close',
+                'volume': 'volume',
+                'Adj close': 'adj_close'
             }, inplace=True)
             
             # 필요한 컬럼만 선택
-            df = df[['Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Adj_Close', 'ticker']]
+            df = df[['date', 'open', 'high', 'low', 'close', 'volume', 'adj_close', 'ticker']]
             
             return df
             
@@ -193,17 +194,17 @@ class DailyStockUpdater:
         df = df.sort_values(by=["ticker", "Date"]).copy()
         
         # 등락률 계산
-        df["price_change_pct"] = df.groupby("ticker")["Close"].pct_change() * 100
-        df["volume_change_pct"] = df.groupby("ticker")["Volume"].pct_change() * 100
+        df["price_change_pct"] = df.groupby("ticker")["close"].pct_change() * 100
+        df["volume_change_pct"] = df.groupby("ticker")["volume"].pct_change() * 100
         
         # 이동평균선
-        df["MA_5"] = df.groupby("ticker")["Close"].transform(lambda x: x.rolling(5).mean())
-        df["MA_20"] = df.groupby("ticker")["Close"].transform(lambda x: x.rolling(20).mean())
-        df["MA_60"] = df.groupby("ticker")["Close"].transform(lambda x: x.rolling(60).mean())
+        df["ma_5"] = df.groupby("ticker")["close"].transform(lambda x: x.rolling(5).mean())
+        df["ma_20"] = df.groupby("ticker")["close"].transform(lambda x: x.rolling(20).mean())
+        df["ma_60"] = df.groupby("ticker")["close"].transform(lambda x: x.rolling(60).mean())
         
         # 거래량 평균
-        df["MA_VOL_20"] = df.groupby("ticker")["Volume"].transform(lambda x: x.rolling(20).mean())
-        df["Volume_Ratio_20"] = df["Volume"] / (df["MA_VOL_20"] + 1e-6)
+        df["ma_VOL_20"] = df.groupby("ticker")["volume"].transform(lambda x: x.rolling(20).mean())
+        df["volume_Ratio_20"] = df["volume"] / (df["ma_VOL_20"] + 1e-6)
         
         # RSI 계산
         def calc_rsi(series, period=14):
@@ -215,21 +216,21 @@ class DailyStockUpdater:
             rs = avg_gain / (avg_loss + 1e-6)
             return 100 - (100 / (1 + rs))
         
-        df["RSI_14"] = df.groupby("ticker")["Close"].transform(calc_rsi)
+        df["rsi_14"] = df.groupby("ticker")["close"].transform(calc_rsi)
         
-        # Bollinger Bands
-        ma20 = df["MA_20"]
-        std20 = df.groupby("ticker")["Close"].transform(lambda x: x.rolling(20).std())
-        df["Bollinger_Upper"] = ma20 + 2 * std20
-        df["Bollinger_Lower"] = ma20 - 2 * std20
-        df["Bollinger_Mid"] = ma20
+        # bollinger Bands
+        ma20 = df["ma_20"]
+        std20 = df.groupby("ticker")["close"].transform(lambda x: x.rolling(20).std())
+        df["bollinger_upper"] = ma20 + 2 * std20
+        df["bollinger_lower"] = ma20 - 2 * std20
+        df["bollinger_mid"] = ma20
         
         # 볼린저 밴드 시그널
-        df["signal_bollinger_upper"] = df["Close"] > df["Bollinger_Upper"]
-        df["signal_bollinger_lower"] = df["Close"] < df["Bollinger_Lower"]
+        df["signal_bollinger_upper"] = df["close"] > df["bollinger_upper"]
+        df["signal_bollinger_lower"] = df["close"] < df["bollinger_lower"]
         
         # 골든/데드 크로스
-        df["ma_diff"] = df["MA_5"] - df["MA_20"]
+        df["ma_diff"] = df["ma_5"] - df["ma_20"]
         df["prev_diff"] = df.groupby("ticker")["ma_diff"].shift(1)
         df["golden_cross"] = (df["prev_diff"] < 0) & (df["ma_diff"] > 0)
         df["dead_cross"] = (df["prev_diff"] > 0) & (df["ma_diff"] < 0)
@@ -248,7 +249,7 @@ class DailyStockUpdater:
                 return
             
             # 날짜 컬럼 형식 변환
-            df['Date'] = pd.to_datetime(df['Date'])
+            df['date'] = pd.to_datetime(df['date'])
             
             # 데이터베이스에 저장
             df.to_sql("krx_stockprice", con=self.engine, if_exists="append", index=False)

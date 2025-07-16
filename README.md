@@ -52,35 +52,17 @@ pytest tests/test_database.py
 │   ├── __init__.py
 │   ├── agent.py                  # 메인 그래프 프레임워크
 │   ├── database.py               # 데이터베이스 연결 관리
-│   ├── updater.py                # 매일 데이터 업데이트
+│   ├── updater.py                # 데이터 업데이트
+│   ├── llm.py                    # llm 연결 관리
 │   └── nodes/                    # 모듈화된 노드들
 │       ├── __init__.py
-│       ├── input_node.py         # 입력 처리 노드
-│       ├── clarification_node.py # 재질문 노드
+│       ├── input_node.py         # 입력 처리 & 재질문 노드
 │       ├── sql_generator_node.py # SQL 생성 노드
 │       ├── sql_refiner_node.py   # SQL 수정 노드
 │       └── output_formatter_node.py # 출력 포맷팅 노드
-├── data/                         # 데이터 저장소
-│   ├── examples/                 # 예시 쿼리
-│   │   ├── simple_queries.csv
-│   │   ├── conditional_queries.csv
-│   │   └── signal_queries.csv
-│   └── stock/                    # 주식 데이터
-│       ├── krx_stockprice.csv
-│       ├── krx_tickers.csv
-│       └── upload.py
-├── api/                          # API 서버
-│   ├── __init__.py
-│   └── main.py                   # FastAPI 메인
 ├── scripts/                      # 실행 스크립트
 │   ├── run_agent.py             # 에이전트 실행
-│   ├── run_api.py               # API 서버 실행
 │   ├── run_daily_update.py      # 데이터 업데이트
-│   ├── deploy_ngrok.py          # ngrok 배포
-│   └── test_agent.py            # 테스트 스크립트
-├── tests/                        # 테스트 코드
-│   ├── test_agent.py            # 에이전트 테스트
-│   └── test_database.py         # 데이터베이스 테스트
 └── logs/                         # 로그 파일
 ```
 

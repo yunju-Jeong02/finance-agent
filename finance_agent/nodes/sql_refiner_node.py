@@ -9,6 +9,8 @@ from langchain_core.prompts import ChatPromptTemplate
 import re
 from config.config import Config
 from finance_agent.database import DatabaseManager
+from finance_agent.llm import LLM
+from finance_agent.prompts import sql_refinement_prompt as prompt
 
 
 class SqlRefinerNode:
@@ -16,11 +18,7 @@ class SqlRefinerNode:
     
     def __init__(self):
         self.config = Config()
-        self.llm = ChatOpenAI(
-            temperature=0.1,
-            model="gpt-4o-mini",
-            openai_api_key=self.config.OPENAI_API_KEY
-        )
+        self.llm = LLM()
         self.db_manager = DatabaseManager()
     
     def process(self, state: Dict) -> Dict:
@@ -33,24 +31,7 @@ class SqlRefinerNode:
         original_query = state["sql_query"]
         error_message = state["sql_error"]
         user_query = state["user_query"]
-        
-        prompt = ChatPromptTemplate.from_template("""
-        다음 SQL 쿼리에서 오류가 발생했습니다. 오류를 수정해주세요.
-        
-        원래 질문: {user_query}
-        오류 쿼리: {original_query}
-        오류 메시지: {error}
-        
-        수정 규칙:
-        1. krx_stockprice 테이블 사용
-        2. 컬럼명 확인: Date, Close, Volume, company_name, ticker, price_change_pct
-        3. KOSPI: ticker LIKE '%.KS'
-        4. KOSDAQ: ticker LIKE '%.KQ'
-        5. 문법 오류 수정
-        
-        수정된 SQL:
-        """)
-        
+           
         try:
             response = self.llm.invoke(prompt.format(
                 user_query=user_query,
@@ -78,7 +59,8 @@ class SqlRefinerNode:
     
     def _clean_sql(self, sql_text: str) -> str:
         """Clean SQL query text"""
+        # '''sql, ```sql, ``` 등 다양한 포맷 모두 제거
         sql_query = sql_text.strip()
-        sql_query = re.sub(r'```sql\n?', '', sql_query)
-        sql_query = re.sub(r'```\n?', '', sql_query)
+        sql_query = re.sub(r"(```sql|'''sql)", "", sql_query, flags=re.IGNORECASE)
+        sql_query = re.sub(r"(```|''')", "", sql_query)
         return sql_query.strip()

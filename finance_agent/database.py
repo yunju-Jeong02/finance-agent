@@ -1,5 +1,5 @@
 """
-Database Manager for krx_stockprice table
+Database manager for krx_stockprice table
 """
 
 import mysql.connector
@@ -9,7 +9,7 @@ import pandas as pd
 from config.config import Config
 
 
-class DatabaseManager:
+class Databasemanager:
     """Database manager for executing SQL queries against krx_stockprice table"""
     
     def __init__(self):
@@ -78,8 +78,8 @@ class DatabaseManager:
         """Get krx_stockprice table schema information"""
         query = """
         SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_COMMENT
-        FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'krx_stockprice'
+        FROM INFORmaTION_SCHEma.COLUMNS
+        WHERE TABLE_SCHEma = %s AND TABLE_NAME = 'krx_stockprice'
         ORDER BY ORDINAL_POSITION
         """
         
@@ -101,27 +101,27 @@ class DatabaseManager:
         return """
         Table: krx_stockprice
         Columns:
-        - Date: 거래 일자 (YYYY-MM-DD)
-        - Adj_Close: 수정 종가
-        - Close: 종가
-        - High: 당일 최고가
-        - Low: 당일 최저가
-        - Open: 당일 시가
-        - Volume: 당일 거래량 (주식 수)
+        - date: 거래 일자 (YYYY-MM-DD)
+        - adj_close: 수정 종가
+        - close: 종가
+        - high: 당일 최고가
+        - low: 당일 최저가
+        - open: 당일 시가
+        - volume: 당일 거래량 (주식 수)
         - ticker: 종목 코드 (예: 005930.KS)
         - company_name: 종목의 회사명
         - price_change_pct: 전일 대비 등락률 (%)
         - volume_change_pct: 전일 대비 거래량 변화율 (%)
-        - MA_5, MA_20, MA_60: 5일, 20일, 60일 단순 이동평균선
-        - MA_VOL_20: 20일 거래량 평균
-        - Volume_Ratio_20: 현재 거래량 / 20일 평균 거래량
-        - RSI_14: 14일 기준 RSI
-        - Bollinger_Mid: 20일 이동평균선
-        - Bollinger_Upper: 볼린저 상단 밴드
-        - Bollinger_Lower: 볼린저 하단 밴드
+        - ma_5, ma_20, ma_60: 5일, 20일, 60일 단순 이동평균선
+        - ma_VOL_20: 20일 거래량 평균
+        - volume_ratio_20: 현재 거래량 / 20일 평균 거래량
+        - rsi_14: 14일 기준 RSI
+        - bollinger_mid: 20일 이동평균선
+        - bollinger_upper: 볼린저 상단 밴드
+        - bollinger_lower: 볼린저 하단 밴드
         - signal_bollinger_upper: 종가가 상단 밴드 초과시 True
         - signal_bollinger_lower: 종가가 하단 밴드 이하시 True
-        - ma_diff: MA_5 - MA_20
+        - ma_diff: ma_5 - ma_20
         - prev_diff: 전날의 ma_diff
         - golden_cross: 골든크로스 발생시 True
         - dead_cross: 데드크로스 발생시 True
@@ -139,7 +139,7 @@ class DatabaseManager:
     def get_sample_data(self, limit: int = 5) -> List[Dict]:
         """Get sample data from krx_stockprice table"""
         query = f"""
-        SELECT Date, ticker, company_name, Close, Volume, price_change_pct
+        SELECT *
         FROM krx_stockprice
         ORDER BY Date DESC
         LIMIT {limit}

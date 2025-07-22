@@ -2,14 +2,13 @@
 Database manager for krx_stockprice table
 """
 
-import mysql.connector
-from mysql.connector import Error
+import pymysql
 from typing import List, Dict, Optional, Any
 import pandas as pd
 from config.config import Config
 
 
-class Databasemanager:
+class DatabaseManager:
     """Database manager for executing SQL queries against krx_stockprice table"""
     
     def __init__(self):
@@ -20,25 +19,25 @@ class Databasemanager:
     def connect(self):
         """Establish connection to MySQL database"""
         try:
-            self.connection = mysql.connector.connect(
+            self.connection = pymysql.connect(
                 host=self.config.MYSQL_HOST,
                 port=self.config.MYSQL_PORT,
                 user=self.config.MYSQL_USER,
                 password=self.config.MYSQL_PASSWORD,
                 database=self.config.MYSQL_DATABASE
             )
-            if self.connection.is_connected():
-                print("Connected to MySQL database")
-        except Error as e:
+            # if self.connection.is_connected():
+            #     print("Connected to MySQL database")
+        except Exception as e:
             print(f"Error connecting to MySQL: {e}")
             raise e
     
     def execute_query(self, query: str, params: Optional[List] = None) -> List[Dict]:
         """Execute SQL query and return results as list of dictionaries"""
-        if not self.connection or not self.connection.is_connected():
+        if not self.connection:
             self.connect()
         
-        cursor = self.connection.cursor(dictionary=True)
+        cursor = self.connection.cursor(pymysql.cursors.DictCursor)
         
         try:
             if params:
@@ -63,7 +62,7 @@ class Databasemanager:
             
             return formatted_results
             
-        except Error as e:
+        except Exception as e:
             print(f"Error executing query: {e}")
             raise e
         finally:
@@ -199,7 +198,7 @@ class Databasemanager:
                     return False
             
             # Try to prepare the statement
-            if self.connection and self.connection.is_connected():
+            if self.connection:
                 cursor = self.connection.cursor()
                 try:
                     cursor.execute(f"EXPLAIN {query}")
@@ -218,9 +217,9 @@ class Databasemanager:
     
     def close_connection(self):
         """Close database connection"""
-        if self.connection and self.connection.is_connected():
+        if self.connection:
             self.connection.close()
-            print("Database connection closed")
+            # print("Database connection closed")
     
     def __del__(self):
         """Cleanup on object destruction"""

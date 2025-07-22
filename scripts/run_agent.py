@@ -12,10 +12,7 @@ from finance_agent.agent import FinanceAgentInterface
 
 def main():
     """Graph Framework 실행"""
-    try:
-        print("=== KU-gent Finance Agent 시작 ===")
-        print("SQL 기반 직접 데이터베이스 쿼리를 통해 빠르고 정확한 결과를 제공합니다.\n")
-        
+    try:   
         interface = FinanceAgentInterface()
         interface.start_conversation()
         

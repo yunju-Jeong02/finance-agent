@@ -6,8 +6,6 @@ SQL Generator Node
 from typing import Dict
 from langchain_core.prompts import ChatPromptTemplate
 import re
-from config.config import Config
-
 from finance_agent.database import DatabaseManager
 from finance_agent.llm import LLM
 from finance_agent.prompts import sql_generation_prompt as prompt
@@ -17,21 +15,24 @@ class SqlGeneratorNode:
     """Node for generating SQL queries"""
     
     def __init__(self):
-        self.config = Config()
         self.llm = LLM()
         self.db_manager = DatabaseManager()
     
     def process(self, state: Dict) -> Dict:
         """Generate SQL query from user input"""
         user_query = state["user_query"]
+        parsed_query = state.get("parsed_query", {})
+        company_name = parsed_query.get("company_name", "")
+        ticker = parsed_query.get("ticker", "")
+        market = parsed_query.get("market", "")
+        print(f"parsed_query: {parsed_query}")  # 디버깅용
+
         latest_date = self._get_latest_available_date()
         
         try:
-            prompt_text = prompt.format(user_query=user_query, latest_date=latest_date)
-            response = self.llm.invoke(prompt_text)
-            # LLM 응답이 객체면 .content, 문자열이면 그대로
-            llm_content = response.content if hasattr(response, "content") else str(response)
-            sql_query = self._clean_sql(llm_content)
+            prompt_text = prompt.format(user_query=user_query, latest_date=latest_date, company_name=company_name, ticker=ticker, market=market)
+            llm_content = self.llm.run(prompt_text)
+            sql_query = self._parse_sql(llm_content)
             state["sql_query"] = sql_query
             state["sql_attempts"] = 1
             
@@ -50,8 +51,8 @@ class SqlGeneratorNode:
         
         return state
     
-    def _clean_sql(self, sql_text: str) -> str:
-        """Clean SQL query text"""
+    def _parse_sql(self, sql_text: str) -> str:
+        """parse SQL query text"""
         # '''sql, ```sql, ``` 등 다양한 포맷 모두 제거
         sql_query = sql_text.strip()
         sql_query = re.sub(r"(```sql|'''sql)", "", sql_query, flags=re.IGNORECASE)

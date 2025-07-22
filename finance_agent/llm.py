@@ -1,22 +1,33 @@
 # utils/llm_manager.py
 
-from langchain.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
+from langchain_naver import ChatClovaX
 from langchain.schema import BaseOutputParser
-from config import Config
+from config.config import Config
 
 class LLM:
-    def __init__(self, model_name="gpt-4o-mini", temperature=0.1):
+    def __init__(self, model_type="Hyperclova", model_name="HCX-005", temperature=0.1):
         self.config = Config()
+        self.model_type = model_type
         self.model_name = model_name
         self.temperature = temperature
         self.llm = self._init_llm()
 
+        from langchain_naver import ChatClovaX
+
     def _init_llm(self):
-        return ChatOpenAI(
-            model=self.model_name,
-            temperature=self.temperature,
-            openai_api_key=self.config.OPENAI_API_KEY
-        )
+        if self.model_type == "Hyperclova":
+            return ChatClovaX(
+                model=self.model_name, # HCX-DASH-002 or HCX-005
+                temperature=self.temperature,
+                api_key=self.config.HYPERCLOVA_API_KEY,
+            )
+        elif self.model_type == "OpenAI":
+            return ChatOpenAI(
+                model=self.model_name,
+                temperature=self.temperature,
+                openai_api_key=self.config.OPENAI_API_KEY
+            )
 
     def run(self, prompt: str, parser: BaseOutputParser = None) -> str:
         """

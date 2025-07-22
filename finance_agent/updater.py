@@ -89,7 +89,7 @@ class DailyStockUpdater:
             
             if self.tickers_df.empty:
                 # 파일에서 종목 코드 가져오기 (fallback)
-                self.tickers_df = pd.read_csv("data/stock/krx_tickers.csv")
+                self.tickers_df = pd.read_csv("./data/stock/krx_tickers.csv")
                 self.tickers_df.rename(columns={"회사명": "company_name"}, inplace=True)
             
             self.logger.info(f"종목 코드 로드 완료: {len(self.tickers_df)}개 종목")
@@ -119,69 +119,84 @@ class DailyStockUpdater:
         """개별 종목 데이터 가져오기"""
         try:
             # yfinance를 사용하여 데이터 가져오기
-            stock = yf.Ticker(ticker)
-            df = stock.history(start=start_date, end=end_date)
+            df = yf.download(ticker, start=start_date, end=end_date, interval="1d", auto_adjust=False, progress=False)
             
             if df.empty:
                 return None
             
             # 데이터 정리
+            df.columns = [f"{col[0]}_{col[1]}" for col in df.columns]
             df = df.reset_index()
+            df.columns = ['date', 'adj_close', 'close', 'high', 'low', 'open', 'volume']
             df['ticker'] = ticker
-            df['Date'] = pd.to_datetime(df['Date']).dt.date
-            
-            # 컬럼 이름 정리
-            df.rename(columns={
-                'Date': 'date',
-                'Open': 'open',
-                'High': 'high', 
-                'Low': 'low',
-                'close': 'close',
-                'volume': 'volume',
-                'Adj close': 'adj_close'
-            }, inplace=True)
-            
-            # 필요한 컬럼만 선택
-            df = df[['date', 'open', 'high', 'low', 'close', 'volume', 'adj_close', 'ticker']]
-            
+            df['date'] = pd.to_datetime(df['date']).dt.date
             return df
             
         except Exception as e:
             self.logger.warning(f"종목 {ticker} 데이터 가져오기 실패: {e}")
             return None
+        
+    def fetch_all_stocks_data(self, ticker_list: List, start_date: str, end_date: str) -> Optional[pd.DataFrame]:
+        """종목list에 대하여 주가 데이터 가져오기"""
+        try:
+            df = yf.download(ticker_list, start=start_date, end=end_date, interval="1d", auto_adjust=False)
+            
+            df_tidy = df.stack(level=1, future_stack=True).reset_index()
+
+            # 컬럼명 정리
+            df_tidy = df_tidy.rename(columns={"Ticker": "ticker",
+                                                "Date": "date",
+                                                "Adj Close": "adj_close",
+                                                "Close": "close",
+                                                "High": "high",
+                                                "Low": "low",
+                                                "Open": "open",
+                                                "Volume": "volume"
+                                              })
+
+            # 3. 컬럼 순서 조정 (원하는 순서로)
+            df_tidy.columns = ['date', 'adj_close', 'close', 'high', 'low', 'open', 'volume', 'ticker']
+            df_tidy['date'] = pd.to_datetime(df_tidy['date']).dt.date
+            return df_tidy
+        except Exception as e:
+            self.logger.error(f"종목 데이터 가져오기 실패: {e}")
+            return None
     
-    def fetch_all_stocks_data(self, start_date: str, end_date: str) -> pd.DataFrame:
-        """모든 종목 데이터 가져오기"""
-        all_data = []
-        total_tickers = len(self.tickers_df)
+    # def fetch_all_stocks_data(self, start_date: str, end_date: str) -> pd.DataFrame:
+    #     """모든 종목 데이터 가져오기"""
+    #     all_data = []
+    #     total_tickers = len(self.tickers_df)
         
-        self.logger.info(f"데이터 수집 시작: {start_date} ~ {end_date}")
+    #     self.logger.info(f"데이터 수집 시작: {start_date} ~ {end_date}")
+
+    #     ticker_list = self.tickers_df['ticker'].tolist()
         
-        for idx, row in self.tickers_df.iterrows():
-            ticker = row['ticker']
-            company_name = row['company_name']
-            
-            # 진행률 표시
-            if idx % 50 == 0:
-                self.logger.info(f"진행률: {idx}/{total_tickers} ({idx/total_tickers*100:.1f}%)")
-            
-            # 데이터 가져오기
-            stock_data = self.fetch_stock_data(ticker, start_date, end_date)
-            
-            if stock_data is not None:
-                stock_data['company_name'] = company_name
-                all_data.append(stock_data)
-            
-            # API 호출 제한을 위한 딜레이
-            time.sleep(0.1)
         
-        if all_data:
-            combined_df = pd.concat(all_data, ignore_index=True)
-            self.logger.info(f"데이터 수집 완료: {len(combined_df)}개 레코드")
-            return combined_df
-        else:
-            self.logger.warning("수집된 데이터가 없습니다.")
-            return pd.DataFrame()
+    #     for idx, row in self.tickers_df.iterrows():
+    #         ticker = row['ticker']
+    #         company_name = row['company_name']
+            
+    #         # 진행률 표시
+    #         if idx % 50 == 0:
+    #             self.logger.info(f"진행률: {idx}/{total_tickers} ({idx/total_tickers*100:.1f}%)")
+            
+    #         # 데이터 가져오기
+    #         stock_data = self.fetch_stock_data(ticker, start_date, end_date)
+            
+    #         if stock_data is not None:
+    #             stock_data['company_name'] = company_name
+    #             all_data.append(stock_data)
+            
+    #         # API 호출 제한을 위한 딜레이
+    #         time.sleep(0.1)
+        
+    #     if all_data:
+    #         combined_df = pd.concat(all_data, ignore_index=True)
+    #         self.logger.info(f"데이터 수집 완료: {len(combined_df)}개 레코드")
+    #         return combined_df
+    #     else:
+    #         self.logger.warning("수집된 데이터가 없습니다.")
+    #         return pd.DataFrame()
     
     def compute_technical_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
         """기술적 지표 계산 (기존 upload.py 코드 참조)"""
@@ -194,13 +209,13 @@ class DailyStockUpdater:
         df = df.sort_values(by=["ticker", "Date"]).copy()
         
         # 등락률 계산
-        df["price_change_pct"] = df.groupby("ticker")["close"].pct_change() * 100
+        df["price_change_pct"] = df.groupby("ticker")["adj_close"].pct_change() * 100
         df["volume_change_pct"] = df.groupby("ticker")["volume"].pct_change() * 100
         
         # 이동평균선
-        df["ma_5"] = df.groupby("ticker")["close"].transform(lambda x: x.rolling(5).mean())
-        df["ma_20"] = df.groupby("ticker")["close"].transform(lambda x: x.rolling(20).mean())
-        df["ma_60"] = df.groupby("ticker")["close"].transform(lambda x: x.rolling(60).mean())
+        df["ma_5"] = df.groupby("ticker")["adj_close"].transform(lambda x: x.rolling(5).mean())
+        df["ma_20"] = df.groupby("ticker")["adj_close"].transform(lambda x: x.rolling(20).mean())
+        df["ma_60"] = df.groupby("ticker")["adj_close"].transform(lambda x: x.rolling(60).mean())
         
         # 거래량 평균
         df["ma_VOL_20"] = df.groupby("ticker")["volume"].transform(lambda x: x.rolling(20).mean())
@@ -216,20 +231,20 @@ class DailyStockUpdater:
             rs = avg_gain / (avg_loss + 1e-6)
             return 100 - (100 / (1 + rs))
         
-        df["rsi_14"] = df.groupby("ticker")["close"].transform(calc_rsi)
+        df["rsi_14"] = df.groupby("ticker")["adj_close"].transform(calc_rsi)
         
         # bollinger Bands
         ma20 = df["ma_20"]
-        std20 = df.groupby("ticker")["close"].transform(lambda x: x.rolling(20).std())
+        std20 = df.groupby("ticker")["adj_close"].transform(lambda x: x.rolling(20).std())
         df["bollinger_upper"] = ma20 + 2 * std20
         df["bollinger_lower"] = ma20 - 2 * std20
         df["bollinger_mid"] = ma20
         
         # 볼린저 밴드 시그널
-        df["signal_bollinger_upper"] = df["close"] > df["bollinger_upper"]
-        df["signal_bollinger_lower"] = df["close"] < df["bollinger_lower"]
+        df["signal_bollinger_upper"] = df["adj_close"] > df["bollinger_upper"]
+        df["signal_bollinger_lower"] = df["adj_close"] < df["bollinger_lower"]
         
-        # 골든/데드 크로스
+        # 골든/데드 크로스: 20일 이동평균선에서 5일 이동평균선을 비교
         df["ma_diff"] = df["ma_5"] - df["ma_20"]
         df["prev_diff"] = df.groupby("ticker")["ma_diff"].shift(1)
         df["golden_cross"] = (df["prev_diff"] < 0) & (df["ma_diff"] > 0)

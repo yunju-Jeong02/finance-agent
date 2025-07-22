@@ -38,4 +38,4 @@ class OutputFormatterNode:
         rows = [" | ".join(str(row.get(col, "")) for col in columns) for row in results]
         table = f"{header}\n{sep}\n" + "\n".join(rows)
         
-        return f"[Q] {user_query}\n\n[결과]\n{table}"
+        return f"\n [결과]\n{table}"

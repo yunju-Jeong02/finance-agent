@@ -1,13 +1,15 @@
 import os
 from dotenv import load_dotenv
-
 load_dotenv()
 
 class Config:
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-    MYSQL_HOST = os.getenv("MYSQL_HOST", "localhost")
-    MYSQL_PORT = int(os.getenv("MYSQL_PORT", 3306))
-    MYSQL_USER = os.getenv("MYSQL_USER", "root")
+    HYPERCLOVA_API_KEY = os.getenv("HYPERCLOVA_API_KEY")
+    HYPERCLOVA_REQUEST_KEY = os.getenv("HYPERCLOVA_REQUEST_KEY")
+
+    MYSQL_HOST = os.getenv("MYSQL_HOST")
+    MYSQL_PORT = int(os.getenv("MYSQL_PORT"))
+    MYSQL_USER = os.getenv("MYSQL_USER")
     MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD")
     MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "finance_db")
     

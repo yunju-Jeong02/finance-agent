@@ -1,10 +1,16 @@
 from finance_agent import QueryParserNode
+from finance_agent import SqlGeneratorNode
 
 parser_node = QueryParserNode()
+generator_node = SqlGeneratorNode()
 
-response = parser_node.process({
-    "user_query": "피코그램의 2024-09-10 종가는?"
+response = generator_node.process({
+    "user_query": "현대사료의 2025-05-12 시가은?",
+    "parsed_query": parser_node.process({
+        "user_query": "현대사료의 2025-05-12 시가은?"
+    })  
 })
+
 
 print(response)
                              

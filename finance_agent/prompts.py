@@ -56,7 +56,7 @@ output:
 
 query_parser_prompt = """
 금융 관련 질문이 주어졌을 때, 아래 정보를 추출하여 JSON 형식으로 출력해주세요.
-1. 날짜
+1. 날짜: 특정 날짜가 아닌 범위가 주어진 경우, "" 반환
 2. 회사명: 해당 회사를 잘 몰라도 질문의 맥락 상 회사명이라고 판단되는 경우 추출 
 3. 시장: KOSPI, KOSDAQ, KONEX 중 하나
 
@@ -88,6 +88,16 @@ output:
     "market": ""
 }}
 ```
+```
+사용자 질문: 현대사료에서 2024-06-01부터 2025-06-30까지 골든크로스가 몇번 발생했어?
+output:
+```json
+{{
+    "date": "",
+    "company_name": "현대사료",
+    "market": ""
+}}
+```
 
 이제 다름 사용자 질문에 대해 JSON 형식(```json ```)으로 답변해주세요.
 ==============
@@ -97,70 +107,80 @@ output:
 
 
 sql_generation_prompt = """
-질문에 대한 힌트를 참고하여 질문을 krx_stockprice 테이블에 대한 MYSQL 쿼리로 변환해주세요.
+질문에 대한 힌트를 **반드시** 반영하여 질문을 krx_stockprice 테이블에 대한 MYSQL 쿼리로 변환해주세요.
+
+<주어질 정보>
+- 사용자 질문
+- 종목 검색 힌트: ticker = '종목 코드' 형태로 주어지며, 종목 검색 힌트가 없으면 빈 문자열("")로 주어집니다. 
+- 시장 검색 힌트: ticker LIKE '%.KS' 또는 ticker LIKE '%.KQ' 형태로 주어지며, 시장 검색 힌트가 없으면 빈 문자열("")로 주어집니다.
+
+<SQL 쿼리 작성 규칙>
+1. 날짜는 항상 YYYY-MM-DD 포맷. 날짜가 없으면 최신 날짜 {latest_date} 사용
+2. 종목 검색 힌트가 주어졌을 경우, **반드시** 이 힌트를 그대로 사용해야 하며, 절대 ticker 검색에 한글 회사명을 사용해서는 안 됩니다. 
+3. 가장 비싼: ORDER BY adj_close DESC
+4. 상승: price_change_pct > 0
+5. 하락: price_change_pct < 0
+6. SELECT * 사용하지 말 것. 관련 있는 칼럼만을 선택
+7. 모든 컬럼/테이블명은 아래 설명된 이름만 사용
+8. market 이 KOSPI인 경우 ticker LIKE '%.KS', KOSDAQ인 경우 ticker LIKE '%.KQ'로 필터링
 
 <krx_stockprice 칼럼>
 - date: 거래 일자 (YYYY-MM-DD)
-- adj_close: 수정 종가
-- close: 종가
+- adj_close: 당일 수정 종가
+- close: 당일 종가
 - high: 당일 최고가
 - low: 당일 최저가
 - open: 당일 시가
 - volume: 당일 거래량 (주식 수)
-- ticker: 종목 코드 (예: 005930.KS)
-- company_name: 종목의 한글회사명 (예: 삼성전자)
+- ticker: 종목 코드 (예: 005930.KS, 016790.KQ)
 - price_change_pct: 전일 대비 등락률 (%)
 - volume_change_pct: 전일 대비 거래량 변화율 (%)
 - ma_5, ma_20, ma_60: 5일, 20일, 60일 단순 이동평균선
 - ma_vol_20: 20일 거래량 평균
 - volume_ratio_20: 현재 거래량 / 20일 평균 거래량
 - rsi_14: 14일 기준 RSI
-- bollinger_mid: 20일 이동평균선
-- bollinger_upper: 볼린저 상단 밴드
-- bollinger_lower: 볼린저 하단 밴드
 - signal_bollinger_upper: 종가가 상단 밴드 초과시 True
 - signal_bollinger_lower: 종가가 하단 밴드 이하시 True
-- ma_diff: ma_5 - ma_20
-- prev_diff: 전날의 ma_diff
 - golden_cross: 골든크로스 발생시 True
 - dead_cross: 데드크로스 발생시 True
 
-<SQL 쿼리 작성 규칙>
-1. 날짜는 항상 YYYY-MM-DD 포맷. 날짜가 없으면 최신 날짜 {latest_date} 사용
-2. 특정 주식 시장에 대한 정보가 없으면 전체 시장에서 검색
-3. 힌트로 티커가 주어진 경우: ticker = '주어진 티커'를 조건으로 사용하여 검색
-4. 가장 비싼: ORDER BY adj_close DESC
-5. 상승: price_change_pct > 0
-6. 하락: price_change_pct < 0
-7. SELECT 문만 사용
-8. 모든 컬럼/테이블명은 위에 설명된 이름만 사용
-9. 종목 나열을 요청 받은 경우: ticker가 아닌 company_name 컬럼을 사용하여 나열. SELECT company_name, ..
-
-<예시1>
+<예시>
 사용자 질문: 2024-10-29에서 KOSPI에서 거래량 많은 종목 10개는? 
-힌트: company_name: "", ticker: "", market: "KOSPI"
+종목 검색 힌트: ""
+시장 검색 힌트: ticker LIKE '%.KS'
 출력:
 ```sql
-SELECT company_name
-FROM krx_stockprice
+SELECT ticker
+FROM krx_stockprice, volume -- 거래량도 같이 출력
 WHERE date = '2024-10-29' AND ticker LIKE '%.KS'
 ORDER BY volume DESC
 LIMIT 10
 ```
-<예시2>
 사용자 질문: 현대사료의 2025-05-13 시가는?
-힌트: company_name: "현대사료", ticker: "016790.KS", market: "")
+종목 검색 힌트: ticker = '016790.KS'
+시장 검색 힌트: ""
 출력:
 ```sql
-SELECT company_name, open
+SELECT ticker, open 
 FROM krx_stockprice
 WHERE ticker = '016790.KS' and date = '2025-05-13';
+```
+사용자 질문: 2025-01-13에 RSI가 70 이상인 과매수 종목을 알려줘
+종목 검색 힌트: ""
+시장 검색 힌트: ""
+출력:
+```sql
+SELECT ticker, rsi_14 -- RSI 값도 같이 출력
+FROM krx_stockprice
+WHERE date = '2025-01-13' AND rsi_14 >= 70
+ORDER BY rsi_14 DESC;
 ```
 
 이제 다음 사용자 질문을 SQL 쿼리로 변환해주세요.
 ================
-사용자 질문: {query}
-힌트: company_name: {company_name}, ticker: {ticker}, market: {market}
+사용자 질문: {user_query}
+종목 검색 힌트: {ticker_hint}
+시장 검색 힌트: {market_hint}
 출력:
 """
 
@@ -175,39 +195,31 @@ SQL 쿼리만을 출력해야합니다. 또한 SQL 쿼리 출력은 ```sql로 �
 <SQL 쿼리 작성 규칙>
 1. 날짜는 항상 YYYY-MM-DD 포맷. 날짜가 없으면 최신 날짜 {latest_date} 사용
 2. 특정 주식 시장에 대한 정보가 없으면 전체 시장에서 검색
-2. KOSPI: ticker LIKE '%.KS'
-3. KOSDAQ: ticker LIKE '%.KQ'
+3. 특정 종목에 대한 정보를 요청할 경우: ticker = '주어진 티커'를 where 조건으로 사용하여 해당 종목에 대한 정보만 검색 (예: WHERE ticker = '005930.KS')
 4. 가장 비싼: ORDER BY adj_close DESC
 5. 상승: price_change_pct > 0
 6. 하락: price_change_pct < 0
-7. SELECT 문만 사용
-8. SQL query는 ```sql로 시작하고, 마지막에 ```로 끝나야 합니다.
-9. 모든 컬럼/테이블명은 위에 설명된 이름만 사용
-10. 종목 나열은 ticker가 아닌 company_name 컬럼으로만: SELECT company_name, ..
+7. SELECT * 사용하지 말 것. 관련 있는 칼럼만을 선택
+8. 모든 컬럼/테이블명은 위에 설명된 이름만 사용
+9. market 이 KOSPI인 경우 ticker LIKE '%.KS', KOSDAQ인 경우 ticker LIKE '%.KQ'로 필터링
 
 <krx_stockprice 칼럼 설명>
 - date: 거래 일자 (YYYY-MM-DD)
-- adj_close: 수정 종가
-- close: 종가
+- adj_close: 당일 수정 종가
+- close: 당일 종가
 - high: 당일 최고가
 - low: 당일 최저가
 - open: 당일 시가
 - volume: 당일 거래량 (주식 수)
 - ticker: 종목 코드 (예: 005930.KS)
-- company_name: 종목의 회사명
 - price_change_pct: 전일 대비 등락률 (%)
 - volume_change_pct: 전일 대비 거래량 변화율 (%)
 - ma_5, ma_20, ma_60: 5일, 20일, 60일 단순 이동평균선
 - ma_vol_20: 20일 거래량 평균
 - volume_ratio_20: 현재 거래량 / 20일 평균 거래량
 - rsi_14: 14일 기준 RSI
-- bollinger_mid: 20일 이동평균선
-- bollinger_upper: 볼린저 상단 밴드
-- bollinger_lower: 볼린저 하단 밴드
 - signal_bollinger_upper: 종가가 상단 밴드 초과시 True
 - signal_bollinger_lower: 종가가 하단 밴드 이하시 True
-- ma_diff: ma_5 - ma_20
-- prev_diff: 전날의 ma_diff
 - golden_cross: 골든크로스 발생시 True
 - dead_cross: 데드크로스 발생시 True
 

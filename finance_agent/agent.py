@@ -215,7 +215,6 @@ class FinanceAgent:
 
 class FinanceAgentInterface:
     """Interface for graph framework"""
-    
     def __init__(self):
         self.framework = FinanceAgent()
         self.current_session_id = None

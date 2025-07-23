@@ -1,8 +1,8 @@
 import pandas as pd
 from typing import Dict
+import re, json
 from finance_agent.llm import LLM
 from finance_agent.prompts import query_parser_prompt as prompt
-from finance_agent.parsers import extract_json_from_response
 import datetime
 
 class QueryParserNode:
@@ -28,17 +28,23 @@ class QueryParserNode:
         user_query = state.get("user_query", "")
         try:
             response = self.llm.run(prompt.format(user_query=user_query))
-            parsed = extract_json_from_response(response)
+            parsed = self._parse_json(response)
+            # print(f"[QueryParserNode] Parsed response: {parsed}")  # 디버깅용
 
             # 날짜 파싱 및 요일 판별
             date_str = parsed.get("date")
-            date, date_day = None, None
-            if date_str:
-                try:
-                    date = datetime.datetime.strptime(date_str, "%Y-%m-%d")
-                    date_day = self.get_day_label(date)
-                except ValueError:
-                    print(f"Invalid date format: {date_str}")
+            if isinstance(date_str, str):
+                date, date_day = None, None
+                if date_str:
+                    try:
+                        date = datetime.datetime.strptime(date_str, "%Y-%m-%d")
+                        date_day = self.get_day_label(date)
+                    except ValueError:
+                        print(f"Invalid date format: {date_str}")
+                        date = None
+                        date_day = None
+            else:
+                date, date_day = None, None
 
             # 회사명 및 티커 추출
             company_name = parsed.get("company_name")
@@ -57,7 +63,6 @@ class QueryParserNode:
                 state["is_complete"] = True
                 state["needs_user_input"] = False
                 
-
         except Exception as e:
             print(f"[QueryParserNode] Parsing error: {e}")
             state["parsed_query"] = {
@@ -67,5 +72,16 @@ class QueryParserNode:
                 "date_day": None,
                 "market": ""
             }
-
         return state
+
+    def _parse_json(self, response: str) -> Dict:
+        """Extract JSON from LLM response"""
+        try:
+            match = re.search(r"```json\s*(.*?)```", response, re.DOTALL)
+            if not match:
+                raise ValueError("No JSON block found")
+            json_str = match.group(1).strip()
+            return json.loads(json_str)
+        except (ValueError, json.JSONDecodeError) as e:
+            print(f"JSON parsing error: {e}")
+            return {}

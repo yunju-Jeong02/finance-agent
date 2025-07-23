@@ -11,12 +11,10 @@ from finance_agent.llm import LLM
 
 
 class InputNode:
-    """Node for processing user input"""
     def __init__(self):
         pass
     
     def process(self, state: Dict) -> Dict:
-        """Process user input and determine clarity"""
         query_history = state["user_query"]
         clarification = self._check_query_clarity(query_history)
         state.update(clarification)
@@ -26,7 +24,6 @@ class InputNode:
         llm = LLM()
         prompt = clarification_prompt.format(user_query=query)
         response = llm.run(prompt)
-        # print(f"Clarification response: {response}")
 
         # JSON 파싱
         response = extract_json_from_response(response)

@@ -1,21 +1,23 @@
 from airflow import DAG
-from airflow.operators.python_operator import PythonOperator
+from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
-import requests
+from sqlalchemy import create_engine, text
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
 import pandas as pd
-import pymysql
-from sqlalchemy import create_engine
+import time
 
+# DB 설정
 DB_CONFIG = {
-    'host': 'miraeasset-database-1.c5w8cg8kau54.ap-northeast-2.rds.amazonaws.com',
     'user': 'admin',
     'password': 'miraeasset25!',
+    'host': 'miraeasset-database-1.c5w8cg8kau54.ap-northeast-2.rds.amazonaws.com',
     'port': 3306,
-    'database': 'news_DB',
-    'charset': 'utf8mb4'
+    'database': 'news_DB'
 }
 
+# 시간대별 수집 개수
 COUNT_MAP = {
     '09': 1500,
     '12': 1250,
@@ -23,105 +25,99 @@ COUNT_MAP = {
     '18': 1000
 }
 
-default_args = {
-    'owner': 'airflow',
-    'depends_on_past': False,
-    'retries': 1,
-    'retry_delay': timedelta(minutes=5),
-    'start_date': datetime(2025, 7, 18),
-}
-
-def crawl_naver_news(max_count):
-    collected = []
-    page = 1
-    base_url = "https://search.naver.com/search.naver?where=news&query=경제&sort=1&sm=tab_pge&start="
-    while len(collected) < max_count:
-        start = 1 + (page - 1) * 10
-        url = f"{base_url}{start}"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        news_items = soup.select("div.news_wrap.api_ani_send")
-
-        if not news_items:
-            break
-
-        for item in news_items:
-            title_tag = item.select_one("a.news_tit")
-            if not title_tag:
-                continue
-            title = title_tag.get('title')
-            link = title_tag.get('href')
-            date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            collected.append([date, title, link])
-            if len(collected) >= max_count:
-                break
-        page += 1
-
-    df = pd.DataFrame(collected, columns=["date", "title", "link"])
-    return df
-
-def update_database(**context):
-    execution_hour = context['execution_date'].strftime('%H')
-    max_count = COUNT_MAP.get(execution_hour, 0)
-    if max_count == 0:
-        print(f"No crawling scheduled at hour {execution_hour}")
-        return
-
-    print(f"Starting crawl for {max_count} articles at hour {execution_hour}")
-    df = crawl_naver_news(max_count)
-    if df.empty:
-        print("No articles found")
-        return
-
-    # DB 연결 및 테이블 생성
-    conn = pymysql.connect(**DB_CONFIG)
-    with conn.cursor() as cursor:
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS News (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            date VARCHAR(20),
-            title TEXT,
-            link TEXT,
-            UNIQUE KEY unique_link (link(255))
-        ) CHARACTER SET utf8mb4;
-        """)
-    conn.commit()
-
-    # SQLAlchemy 엔진 생성
-    engine = create_engine(
+def get_engine():
+    return create_engine(
         f"mysql+pymysql://{DB_CONFIG['user']}:{DB_CONFIG['password']}@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}"
     )
 
-    # 중복 삽입 무시하고 데이터 삽입
-    df.to_sql('News', con=engine, if_exists='append', index=False, method='multi')
+def get_economy_news_by_date(date_str, max_page=250):
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+    driver = webdriver.Chrome(options=options)
 
-    # 최신 5000개 초과 삭제 (오래된 뉴스 삭제)
-    with conn.cursor() as cursor:
-        delete_sql = """
-        DELETE FROM News
-        WHERE id NOT IN (
-            SELECT id FROM (
-                SELECT id FROM News ORDER BY date DESC LIMIT 5000
-            ) AS latest
-        );
-        """
-        cursor.execute(delete_sql)
-    conn.commit()
-    conn.close()
-    print(f"DB update completed at hour {execution_hour}")
+    articles = []
+    for page in range(1, max_page + 1):
+        url = f"https://news.naver.com/main/list.naver?mode=LS2D&mid=shm&sid1=101&date={date_str}&page={page}"
+        driver.get(url)
+        time.sleep(1.5)
 
+        soup = BeautifulSoup(driver.page_source, "html.parser")
+        news_list = soup.select("ul.type06_headline li") + soup.select("ul.type06 li")
+        if not news_list:
+            break
+
+        for li in news_list:
+            title, href = None, None
+            img_tag = li.select_one("dt.photo img")
+            if img_tag and img_tag.has_attr("alt"):
+                title = img_tag["alt"].strip()
+                a_tag = li.select_one("dt.photo a")
+                if a_tag and a_tag.has_attr("href"):
+                    href = a_tag["href"]
+
+            if not title or not href:
+                for a in li.select("dt a"):
+                    t = a.get_text(strip=True)
+                    h = a.get("href", "")
+                    if t and "n.news.naver.com" in h:
+                        title = t
+                        href = h
+                        break
+            if title and href:
+                articles.append({"date": date_str, "title": title, "link": href})
+
+    driver.quit()
+    return pd.DataFrame(articles)
+
+def update_news(**kwargs):
+    execution_hour = kwargs['logical_date'].strftime('%H')
+    today = kwargs['logical_date'].strftime('%Y%m%d')
+    count = COUNT_MAP.get(execution_hour, 0)
+    if count == 0:
+        print(f"[INFO] No crawl scheduled for hour {execution_hour}")
+        return
+
+    engine = get_engine()
+
+    df = get_economy_news_by_date(today, max_page=250).head(count)
+    if df.empty:
+        print("[WARN] No articles found")
+        return
+
+    df.to_sql('News', con=engine, if_exists='append', index=False)
+    print(f"[INFO] {len(df)}개 {today} 뉴스 DB 삽입 완료")
+
+    with engine.begin() as conn:
+        today_count = conn.execute(text("SELECT COUNT(*) FROM News WHERE date = :today"), {"today": today}).scalar()
+        oldest_date = conn.execute(text("SELECT date FROM News WHERE date != :today ORDER BY date ASC LIMIT 1"), {"today": today}).scalar()
+
+        if oldest_date:
+            oldest_count = conn.execute(text("SELECT COUNT(*) FROM News WHERE date = :d"), {"d": oldest_date}).scalar()
+            if today_count + oldest_count > 5000:
+                conn.execute(text("DELETE FROM News WHERE date = :d"), {"d": oldest_date})
+                print(f"[INFO] 오래된 날짜 {oldest_date} 삭제 (5000개 초과 방지)")
+
+        if execution_hour == "18":
+            conn.execute(text("""
+                DELETE FROM News
+                WHERE date < DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 30 DAY), '%Y%m%d')
+            """))
+            print("[INFO] 30일 초과 데이터 정리 완료")
+
+# DAG 정의
 with DAG(
-    dag_id='naver_news_scraping',
-    default_args=default_args,
-    schedule_interval='0 9,12,15,18 * * *',
+    dag_id="naver_economy_news_dag",
+    start_date=datetime(2025, 7, 30),
+    schedule_interval="0 9,12,15,18 * * *",
     catchup=False,
-    tags=['naver', 'news', 'scraping']
+    default_args={'owner': 'airflow', 'retries': 1, 'retry_delay': timedelta(minutes=5)},
+    tags=['naver', 'news']
 ) as dag:
 
-    update_db_task = PythonOperator(
-        task_id='crawl_and_update_db',
-        python_callable=update_database,
+    update_task = PythonOperator(
+        task_id="crawl_and_update_news",
+        python_callable=update_news,
         provide_context=True
     )
-

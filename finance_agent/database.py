@@ -1,3 +1,4 @@
+
 import pymysql
 import re
 from typing import List, Dict, Optional
@@ -6,7 +7,11 @@ from sqlalchemy import create_engine, text
 from config.config import Config
 import requests
 from bs4 import BeautifulSoup
-
+import time
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from collections import Counter
 
 
 class DatabaseManager:
@@ -99,20 +104,19 @@ class DatabaseManager:
         if self.db_type != "news":
             raise ValueError("search_news는 뉴스 DB 전용입니다.")
 
-        # --- 1) DB 검색 ---
         conditions, params = [], {}
 
         # 날짜를 YYYYMMDD로 변환
         if date:
-            date_yyyymmdd = re.sub(r'[^0-9]', '', date)  # 숫자만 추출
+            date_yyyymmdd = re.sub(r'[^0-9]', '', date)
             if len(date_yyyymmdd) == 8:
                 date = date_yyyymmdd
                 conditions.append("date = :date")
                 params["date"] = date
             else:
-                date = ""  # 날짜 형식이 맞지 않으면 필터 제거
+                date = ""
 
-        # 키워드에서 날짜 패턴 제거
+        # 키워드 정리
         clean_keywords = []
         if keywords:
             for kw in (keywords if isinstance(keywords, (list, tuple)) else [keywords]):
@@ -125,7 +129,6 @@ class DatabaseManager:
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
 
-        # DISTINCT로 중복 제거
         query_with_content = text(f"""
             SELECT DISTINCT title, link, date, content
             FROM News
@@ -133,73 +136,165 @@ class DatabaseManager:
             ORDER BY date DESC
             LIMIT :limit;
         """)
-        query_no_content = text(f"""
-            SELECT DISTINCT title, link, date, NULL as content
-            FROM News
-            WHERE {where_clause}
-            ORDER BY date DESC
-            LIMIT :limit;
-        """)
         params["limit"] = limit
+
+        # 디버깅 로그 추가
+        print(f"[DEBUG:search_news] date param: {date}, keywords: {clean_keywords}")
+        print(f"[DEBUG:search_news] SQL: {query_with_content}")
+        print(f"[DEBUG:search_news] Params: {params}")
 
         try:
             df = pd.read_sql(query_with_content, self.engine, params=params)
-        except Exception:
+        except Exception as e:
+            print(f"[DEBUG:search_news] with_content 실패: {e}")
+            query_no_content = text(f"""
+                SELECT DISTINCT title, link, date, NULL as content
+                FROM News
+                WHERE {where_clause}
+                ORDER BY date DESC
+                LIMIT :limit;
+            """)
             df = pd.read_sql(query_no_content, self.engine, params=params)
 
-        # DB에서 결과가 있으면 반환
+        print(f"[DEBUG:search_news] DB 결과 {len(df)}건")
         if not df.empty:
             return df.to_dict(orient="records")
 
-        # --- 2) Fallback: 네이버 HTML 크롤링 ---
+        # --- fallback 크롤링 ---
         company = clean_keywords[0] if clean_keywords else ""
         extra_keywords = clean_keywords[1:] if len(clean_keywords) > 1 else []
+        print(f"[DEBUG:search_news] DB 결과 없음, 크롤링 시도 -> company={company}, extra={extra_keywords}, date={date}")
         return self._crawl_naver_news(company, extra_keywords, date, limit)
 
 
+    def _crawl_naver_news(self, company: str, extra_keywords: list, date: str = None, limit: int = 3):
+        keyword_query = " ".join([company] + (extra_keywords or [])) if company else ""
 
-    def _crawl_naver_news(self, company: str, extra_keywords: list, date: Optional[str], limit: int = 5) -> List[Dict]:
-            """
-            네이버 뉴스 HTML 크롤링 (기업명 + 추가 키워드 + 날짜)
-            - DB에 뉴스가 없거나 today_news_request일 때 사용.
-            - 본문은 content=""로 두고 나중에 fetch.
-            """
-            # 키워드 조합
-            keyword_query = " ".join([company] + (extra_keywords or [])) if company else " ".join(extra_keywords or [])
-
-            # 네이버 뉴스 검색 URL (날짜 필터링 지원)
-            if date:
+        if date:
+            # date가 "20250601" 같이 순수 숫자 8자리면,
+            #  -> "2025.06.01" 형태로 변환 필요
+            if len(date) == 8 and date.isdigit():
+                ds = de = f"{date[:4]}.{date[4:6]}.{date[6:]}"
+                yyyymmdd = date
+            else:
+                # "2025-06-01" 등일 때
                 ds = de = date.replace("-", ".")
                 yyyymmdd = date.replace("-", "")
-                url = (
-                    f"https://search.naver.com/search.naver"
-                    f"?where=news&query={keyword_query}&sm=tab_opt&sort=1"
-                    f"&ds={ds}&de={de}&nso=so%3Ar%2Cp%3Afrom{yyyymmdd}to{yyyymmdd}"
-                )
-            else:
-                url = f"https://search.naver.com/search.naver?where=news&query={keyword_query}&sort=1"
+            url = (
+                f"https://search.naver.com/search.naver"
+                f"?where=news&query={keyword_query}&sm=tab_opt&sort=0"
+                f"&ds={ds}&de={de}&nso=so%3Ar%2Cp%3Afrom{yyyymmdd}to{yyyymmdd}"
+            )
+        else:
+            url = f"https://search.naver.com/search.naver?where=news&query={keyword_query}&sort=0"
+        options = Options()
+        # 필요에 따라 headless 켜거나 끕니다
+        options.add_argument("--headless")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--no-sandbox")
+        options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
-            try:
-                res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
-                if res.status_code != 200:
-                    return []
+        driver = webdriver.Chrome(options=options)
+        driver.get(url)
+        time.sleep(3)  # 렌더링 대기
 
-                soup = BeautifulSoup(res.text, "html.parser")
-                articles = []
-                for a_tag in soup.select("a.news_tit")[:limit]:
-                    title = a_tag.get("title", "").strip()
-                    link = a_tag.get("href", "").strip()
-                    articles.append({
-                        "title": title,
-                        "link": link,
-                        "date": date or "",  # 날짜 없으면 공백
-                        "content": ""        # 본문은 나중에 fetch
-                    })
+        elements = driver.find_elements(By.CSS_SELECTOR, 'a[target="_blank"][href^="http"]')
 
-                return articles
-            except Exception as e:
-                print(f"[DatabaseManager] 네이버 뉴스 크롤링 실패: {e}")
-                return []
+        articles = []
+        seen = set()
+
+        for el in elements:
+            href = el.get_attribute("href")
+            title = el.get_attribute("title") or el.text
+
+            if not href or href in seen:
+                continue
+            if any(block in href for block in ["/main/static/", "channelPromotion", "/main/vod/", "news/home", "opinion"]):
+                continue
+            if not ("news.naver.com" in href or "n.news.naver.com" in href or "did=NA" in href or "Read" in href):
+                continue
+
+            seen.add(href)
+            articles.append({
+                "title": title.strip(),
+                "link": href,
+                "date": date or "",
+                "content": "",  # 본문은 나중에 개별 fetch
+            })
+            if len(articles) >= limit:
+                break
+
+        driver.quit()
+        return articles
+
+    def _fetch_news_content(self, url: str) -> str:
+        """
+        뉴스 기사 URL에서 본문 크롤링. BS4로 주요 본문 영역 추출.
+        """
+        try:
+            res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+            if res.status_code != 200:
+                return ""
+            soup = BeautifulSoup(res.text, "html.parser")
+            for selector in ["#dic_area", "#articleBody", ".article-body", ".news-article", "div.content"]:
+                div = soup.select_one(selector)
+                if div:
+                    return div.get_text(" ", strip=True)
+            # fallback: 모든 <p> 태그 중 내용이 충분한 문장 합침
+            paragraphs = soup.select("p")
+            text = " ".join(p.get_text(" ", strip=True) for p in paragraphs if len(p.get_text(strip=True)) > 30)
+            return text.strip()
+        except Exception:
+            return ""
+
+    def _crawl_and_summarize_news(self, company: str, extra_keywords: list, date: str = None, limit: int = 3) -> list:
+        """
+        1) Selenium 크롤링으로 뉴스 리스트 가져오기
+        2) 각 뉴스 URL에서 본문 크롤링
+        3) 요약 API 호출(외부 함수)로 요약 생성
+        4) 리스트 형태로 요약 결과 반환
+
+        요약 API 호출함수는 SqlGeneratorNode 클래스 내 구현 예정이므로 인자로 받거나 콜백 활용 가능.
+        """
+        articles = self._crawl_naver_news(company, extra_keywords, date, limit)
+
+        # 요약 API 호출은 외부에서 처리할 수 있도록 content만 채워둠
+        # 예시로 빈 내용 반환 후 요약 담당자 호출 권장
+        for article in articles:
+            article["content"] = self._fetch_news_content(article["link"])
+
+        return articles
+    
+    def get_recent_news_titles(self, limit=100):
+        if self.db_type != "news":
+            raise ValueError("get_recent_news_titles는 뉴스 DB 전용입니다.")
+        query = f"""
+            SELECT title
+            FROM News 
+            ORDER BY date DESC, id DESC 
+            LIMIT {limit}
+        """
+        try:
+            df = pd.read_sql(query, con=self.engine)
+            if df.empty:
+                print("[DatabaseManager] 최근 뉴스 조회 결과가 없습니다.")
+            return df
+        except Exception as e:
+            print(f"[DatabaseManager] 최근 뉴스 조회 실패: {e}")
+            return pd.DataFrame()
+
+    def extract_top_keywords(self, titles: pd.Series, top_n=5):
+        try:
+            text = ' '.join(titles)
+            words = re.sub(r'[^가-힣a-zA-Z0-9\s]', '', text).split()
+            stopwords = {'그리고','하지만','그래서','때문에','있다','하다','되다','않다','수','것','들','등'}
+            counter = Counter([w for w in words if w not in stopwords and len(w) > 1])
+            return [w for w, _ in counter.most_common(top_n)]
+        except Exception as e:
+            print(f"[DatabaseManager] 키워드 추출 실패: {e}")
+            return []
+
     # ----------------- 주식 DB 전용 -----------------
     def get_table_schema(self) -> str:
         """Fetch schema info for krx_stockprice (finance DB only)"""
@@ -308,5 +403,3 @@ class DatabaseManager:
 
     def __del__(self):
         self.close_connection()
-
-

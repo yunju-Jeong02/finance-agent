@@ -13,6 +13,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from collections import Counter
 
+csv_path = "data/krx_tickers.csv"
 
 class DatabaseManager:
     """
@@ -349,19 +350,25 @@ class DatabaseManager:
         except:
             return []
 
-    def get_companies_by_name(self, name_pattern: str) -> List[Dict]:
-        """Search companies by partial name (finance DB only)"""
-        if self.db_type != "finance":
-            return []
-        query = """
-        SELECT DISTINCT ticker, company_name
-        FROM krx_stockprice
-        WHERE company_name LIKE %s
-        ORDER BY company_name
+    def get_companies_by_name(self, name_pattern: str, csv_path: str = "data/ticker_list.csv") -> List[Dict]:
+        """
+        CSV에서 'ticker', 'company_name' 정보를 불러와 name_pattern으로 필터링
         """
         try:
-            return self.execute_query(query, [f"%{name_pattern}%"])
-        except:
+            start = time.time()
+            df = pd.read_csv(csv_path)
+            if not {'ticker', 'company_name'}.issubset(df.columns):
+                raise ValueError("CSV에 'ticker', 'company_name' 컬럼이 모두 포함되어야 합니다.")
+
+            # 이름 패턴 필터링 (부분 일치)
+            filtered = df[df['company_name'].str.contains(name_pattern, case=False, na=False)]
+            result = filtered[['ticker', 'company_name']].drop_duplicates().to_dict(orient="records")
+
+            end = time.time()
+            print(f"[CSV] 매칭된 ticker 개수: {len(result)} | 소요 시간: {end - start:.4f}초")
+            return result
+        except Exception as e:
+            print(f"[DatabaseManager] CSV 기반 get_companies_by_name 실패: {e}")
             return []
 
     def get_available_dates(self, limit: int = 10) -> List[str]:

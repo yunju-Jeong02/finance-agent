@@ -6,7 +6,7 @@ Daily Stock Update Runner
 import sys
 import os
 import argparse
-from datetime import datetime, time
+from datetime import datetime
 
 # 프로젝트 루트 디렉터리를 Python path에 추가
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -22,7 +22,7 @@ def run_daily_update():
     updater = DailyStockUpdater()
     
     try:
-        updater.update_daily_data()
+        updater.update_daily_data()  # 내부에서 start_date, end_date 정상 처리
         print("✓ 업데이트 완료!")
         return 0
         

@@ -1,23 +1,43 @@
 import json, re
+import logging
 
-def extract_json_from_response(response: str):
+# 로깅 포맷 설정 (원하는 레벨로 조정하세요)
+# logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] %(message)s')
+
+def extract_json_from_response(response: str) -> dict:
     """
-    LLM 응답에서 ```json ... ``` 블록을 추출하고,
-    홑따옴표(')가 섞인 경우에도 JSON으로 변환할 수 있게 처리.
+    LLM 응답에서 ```json … ``` 블록을 꺼내고,
+    홑따옴표 문자열 값, 트레일링 콤마를 정제하여 JSON으로 파싱.
+    성공·실패 시 모두 디버그 로그를 남깁니다.
     """
-    match = re.search(r"```json\s*(.*?)```", response, re.DOTALL)
+    # 1) ```json … ``` 블록 추출
+    match = re.search(r"```json\s*(\{.*?\})\s*```", response, re.DOTALL)
     if not match:
+        logging.error("No JSON block found in response.")
         raise ValueError("No JSON block found")
+    json_str = match.group(1)
 
-    json_str = match.group(1).strip()
+    # 2) 값 위치의 홑따옴표 → 쌍따옴표 변환
+    json_str = re.sub(
+        r"(:\s*)'([^']*?)'",
+        lambda m: f'{m.group(1)}\"{m.group(2)}\"',
+        json_str
+    )
 
-    # 홑따옴표를 큰따옴표로 치환 (JSON 호환성 확보)
-    # 단, 이미 큰따옴표가 있는 경우는 그대로 유지
-    if "'" in json_str and '"' not in json_str:
-        json_str = json_str.replace("'", '"')
+    # 3) 트레일링 콤마 제거 (예: {"a":1,} → {"a":1})
+    json_str = re.sub(r",\s*([}\]])", r"\1", json_str)
 
+    # 4) 디버깅: 정제된 JSON 문자열 출력
+#    logging.debug("Cleaned JSON string:\n%s", json_str)
+
+    # 5) 파싱 시도
     try:
-        return json.loads(json_str)
+        parsed = json.loads(json_str)
+        # 성공 디버깅: 파싱 결과 출력
+#        logging.debug("Parsed JSON object: %r", parsed)
+        return parsed
     except json.JSONDecodeError as e:
-        print(f"[DEBUG:extract_json_from_response] JSON 파싱 실패: {e}, 원본: {json_str[:200]}")
+        # 실패 디버깅: 오류 메시지와 문제의 JSON 조각 출력
+#        logging.error("JSON parsing failed: %s", e)
+#        logging.error("Offending JSON snippet:\n%s", json_str)
         return {}

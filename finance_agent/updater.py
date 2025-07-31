@@ -105,12 +105,14 @@ class DailyStockUpdater:
             query = "SELECT max(date) as latest_date FROM krx_stockprice"
             result = pd.read_sql(query, self.engine)
             latest_date = result['latest_date'].iloc[0]
-            
+
             if latest_date:
+                # datetime으로 강제 변환 (문자열이면 datetime으로, datetime이면 그대로 유지)
+                latest_date = pd.to_datetime(latest_date)
                 return latest_date.strftime('%Y-%m-%d')
             else:
                 return None
-                
+
         except Exception as e:
             self.logger.error(f"최신 날짜 조회 실패: {e}")
             return None
@@ -162,43 +164,8 @@ class DailyStockUpdater:
             self.logger.error(f"종목 데이터 가져오기 실패: {e}")
             return None
     
-    # def fetch_all_stocks_data(self, start_date: str, end_date: str) -> pd.DataFrame:
-    #     """모든 종목 데이터 가져오기"""
-    #     all_data = []
-    #     total_tickers = len(self.tickers_df)
-        
-    #     self.logger.info(f"데이터 수집 시작: {start_date} ~ {end_date}")
-
-    #     ticker_list = self.tickers_df['ticker'].tolist()
-        
-        
-    #     for idx, row in self.tickers_df.iterrows():
-    #         ticker = row['ticker']
-    #         company_name = row['company_name']
-            
-    #         # 진행률 표시
-    #         if idx % 50 == 0:
-    #             self.logger.info(f"진행률: {idx}/{total_tickers} ({idx/total_tickers*100:.1f}%)")
-            
-    #         # 데이터 가져오기
-    #         stock_data = self.fetch_stock_data(ticker, start_date, end_date)
-            
-    #         if stock_data is not None:
-    #             stock_data['company_name'] = company_name
-    #             all_data.append(stock_data)
-            
-    #         # API 호출 제한을 위한 딜레이
-    #         time.sleep(0.1)
-        
-    #     if all_data:
-    #         combined_df = pd.concat(all_data, ignore_index=True)
-    #         self.logger.info(f"데이터 수집 완료: {len(combined_df)}개 레코드")
-    #         return combined_df
-    #     else:
-    #         self.logger.warning("수집된 데이터가 없습니다.")
-    #         return pd.DataFrame()
-    
     def compute_technical_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
+        df["adj_close"] = pd.to_numeric(df["adj_close"], errors="coerce")
         """기술적 지표 계산 (기존 upload.py 코드 참조)"""
         if df.empty:
             return df
@@ -206,7 +173,7 @@ class DailyStockUpdater:
         self.logger.info("기술적 지표 계산 시작")
         
         # 날짜순 정렬
-        df = df.sort_values(by=["ticker", "Date"]).copy()
+        df = df.sort_values(by=["ticker", "date"]).copy()
         
         # 등락률 계산
         df["price_change_pct"] = df.groupby("ticker")["adj_close"].pct_change() * 100
@@ -311,7 +278,8 @@ class DailyStockUpdater:
             self.logger.info(f"업데이트 날짜 범위: {start_date} ~ {end_date}")
             
             # 3. 데이터 수집
-            stock_data = self.fetch_all_stocks_data(start_date, end_date)
+            stock_data = self.fetch_all_stocks_data(self.tickers_df['ticker'].tolist(), start_date, end_date)
+
             
             if stock_data.empty:
                 self.logger.warning("수집된 데이터가 없습니다.")

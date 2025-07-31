@@ -1,13 +1,16 @@
 import uuid
 import logging
+import os
 import traceback
 from typing import Dict, List, TypedDict
 from langgraph.graph import StateGraph, END
+
 from finance_agent.nodes.input_node import InputNode
 from finance_agent.nodes.query_parser_node import QueryParserNode
 from finance_agent.nodes.sql_generator_node import SqlGeneratorNode
 from finance_agent.nodes.sql_refiner_node import SqlRefinerNode
 from finance_agent.nodes.output_formatter_node import OutputFormatterNode
+
 
 class GraphState(TypedDict):
     user_query: str
@@ -26,29 +29,30 @@ class GraphState(TypedDict):
     final_output: str
 
     is_complete: bool
+    pending_action: Dict
 
 
 class FinanceAgent:
-    """Graph-based agent for stock and news queries."""
-
     def __init__(self):
+        log_dir = "logs"
+        os.makedirs(log_dir, exist_ok=True)
         logging.basicConfig(
             level=logging.DEBUG,
-            filename='finance_agent.log',
+            filename=os.path.join(log_dir, 'finance_agent.log'),
             filemode='a',
             format='%(asctime)s %(levelname)s:%(message)s'
         )
+
         self.input_node = InputNode()
         self.query_parser_node = QueryParserNode()
         self.sql_generator_node = SqlGeneratorNode()
         self.sql_refiner_node = SqlRefinerNode()
         self.output_formatter_node = OutputFormatterNode()
         self.graph = self._build_graph()
-        self.last_state = None  # 핫뉴스 선택 대응용 상태 저장
+        self.last_state: GraphState = {}
 
     def _build_graph(self) -> StateGraph:
         workflow = StateGraph(GraphState)
-
         workflow.add_node("input_handler", self.input_handler)
         workflow.add_node("query_parser", self.query_parser)
         workflow.add_node("sql_generator", self.sql_generator)
@@ -57,36 +61,37 @@ class FinanceAgent:
 
         workflow.set_entry_point("input_handler")
 
+        # 1) 입력 처리 후 분기
         workflow.add_conditional_edges(
             "input_handler",
             self.route_after_input,
-            {"end": END, "query_parser": "query_parser", "format": "output_formatter"}
+            {"end": END, "query_parser": "query_parser"}
         )
-
+        # 2) 파싱 후에도 clarification_needed 체크
         workflow.add_conditional_edges(
             "query_parser",
             self.route_after_query_parser,
             {"end": END, "sql_generator": "sql_generator"}
         )
-
+        # 3) SQL 생성 분기
         workflow.add_conditional_edges(
             "sql_generator",
             self.route_after_sql_generation,
             {"refine": "sql_refiner", "format": "output_formatter"}
         )
-
+        # 4) 리파인 분기
         workflow.add_conditional_edges(
             "sql_refiner",
             self.route_after_refine,
             {"retry": "sql_refiner", "format": "output_formatter"}
         )
-
+        # 5) 최종 포맷터 → END
         workflow.add_edge("output_formatter", END)
+
         return workflow.compile()
 
     def input_handler(self, state: GraphState) -> GraphState:
-        pending_action = state.get("pending_action")
-        return self.input_node.process({**state, "pending_action": pending_action})
+        return self.input_node.process(state)
 
     def query_parser(self, state: GraphState) -> GraphState:
         return self.query_parser_node.process(state)
@@ -101,30 +106,54 @@ class FinanceAgent:
         return self.output_formatter_node.process(state)
 
     def route_after_input(self, state: GraphState) -> str:
-        # Clarification 필요 시 처리
+        # 🔥 핫뉴스 키워드 선택 단계 처리: 숫자 입력 시 SQL 건너뛰고 바로 output_formatter로 이동
+        if state.get("pending_action", {}).get("type") == "hot_news_select":
+            try:
+                choice_idx = int(state["user_query"].strip()) - 1
+                options = state["pending_action"]["options"]
+                if 0 <= choice_idx < len(options):
+                    selected = options[choice_idx]
+                    state["parsed_query"] = selected["query"]
+                    state["clarification_needed"] = False
+                    state["clarification_question"] = ""
+                    state["needs_user_input"] = False
+                    return "output_formatter"
+                else:
+                    state["final_output"] = "1~5 사이의 숫자를 입력해 주세요."
+                    state["needs_user_input"] = True
+                    return "end"
+            except ValueError:
+                state["final_output"] = "숫자를 정확히 입력해 주세요."
+                state["needs_user_input"] = True
+                return "end"
+
+        # 🔍 일반 Clarification 처리
         if state["clarification_needed"]:
             if state.get("clarification_count", 0) < 2:
-                state["is_complete"] = False
+                state["final_output"] = state["clarification_question"]
                 state["needs_user_input"] = True
                 state["clarification_count"] += 1
-                return "input_handler"
+                return "end"
             else:
                 state["final_output"] = "정보가 부족하여 질문을 이해하지 못했습니다. 더 구체적으로 질문해 주세요."
                 state["is_complete"] = True
+                state["needs_user_input"] = False
                 return "end"
 
-        # 핫뉴스 선택 처리는 이제 process_query()에서만 수행
         return "query_parser"
 
-
     def route_after_query_parser(self, state: GraphState) -> str:
+        # 파싱 직후에도 모호함 요청 처리
+        if state["clarification_needed"]:
+            state["final_output"] = state["clarification_question"]
+            state["needs_user_input"] = True
+            return "end"
         if state.get("is_complete", False):
             return "end"
         return "sql_generator"
-    
+
     def route_after_sql_generation(self, state: GraphState) -> str:
         intent = state.get("parsed_query", {}).get("intent", "")
-        # 뉴스 관련 요청은 SQL 무시하고 바로 출력
         if intent.endswith("_news_request") or intent.endswith("_summary_request") or intent == "hot_news_request":
             return "format"
         return "refine" if state.get("sql_error") else "format"
@@ -134,52 +163,17 @@ class FinanceAgent:
             return "retry"
         return "format"
 
-    def process_query(self, user_query: str, session_id: str = None) -> Dict:
+    def process_query(self, user_query: str, session_id: str = None, clarification_count: int = 0) -> Dict:
         if session_id is None:
             session_id = str(uuid.uuid4())
 
-        # 🔥 핫뉴스 키워드 선택 입력 처리 (graph 생략)
-        pending_state = getattr(self, "last_state", None)
-        if (
-            user_query.isdigit()
-            and isinstance(pending_state, dict)
-            and isinstance(pending_state.get("pending_action", {}), dict)
-            and pending_state.get("pending_action", {}).get("type") == "hot_news_select"
-        ):
-            try:
-                selection = int(user_query)
-                result = self.sql_generator_node.handle_hot_news_selection(pending_state, selection)
-
-                # 후속 입력에서도 안전하게 pending_action 유지 (빈 dict)
-                result["pending_action"] = {}
-
-                self.last_state = result
-                return {
-                    "clarification_question": "",
-                    "response": result.get("final_output", ""),
-                    "needs_user_input": False,
-                    "is_complete": True,
-                    "session_id": session_id,
-                    "sql_query": "",
-                    "sql_attempts": 0,
-                }
-            except Exception as e:
-                return {
-                    "response": f"핫 뉴스 처리 중 오류: {e}",
-                    "needs_user_input": False,
-                    "is_complete": True,
-                    "session_id": session_id,
-                    "sql_query": "",
-                    "sql_attempts": 0,
-                }
-
-        # --- 일반 쿼리 처리 ---
-        initial_state = {
+        pending = self.last_state or {}
+        initial_state: GraphState = {
             "user_query": user_query,
             "session_id": session_id,
             "clarification_needed": False,
-            "clarification_count": 0,
             "clarification_question": "",
+            "clarification_count": clarification_count,
             "needs_user_input": False,
             "parsed_query": {},
             "sql_query": "",
@@ -188,13 +182,13 @@ class FinanceAgent:
             "query_results": [],
             "final_output": "",
             "is_complete": False,
-            # pending_state가 None이면 그냥 None으로 둠
-            "pending_action": pending_state.get("pending_action") if isinstance(pending_state, dict) else None,
+            "pending_action": pending.get("pending_action", {}) if isinstance(pending, dict) else {},
         }
-        self.last_state = initial_state
 
+        self.last_state = initial_state
         try:
             result = self.graph.invoke(initial_state)
+            self.last_state = result
             return {
                 "clarification_question": result.get("clarification_question", ""),
                 "response": result.get("final_output", ""),
@@ -203,8 +197,10 @@ class FinanceAgent:
                 "session_id": session_id,
                 "sql_query": result.get("sql_query", ""),
                 "sql_attempts": result.get("sql_attempts", 0),
+                "clarification_count": result.get("clarification_count", clarification_count),
             }
         except Exception as e:
+            logging.error("process_query error:\n%s", traceback.format_exc())
             return {
                 "response": f"처리 중 오류가 발생했습니다: {e}",
                 "needs_user_input": False,
@@ -212,13 +208,51 @@ class FinanceAgent:
                 "session_id": session_id,
                 "sql_query": "",
                 "sql_attempts": 0,
+                "clarification_count": clarification_count,
             }
 
-    def handle_clarification_response(self, original_query, clarification, session_id, clarification_count=0):
-        combined_query = f"사용자 질문: {original_query}, 추가 정보: {clarification}"
-        return self.process_query(combined_query, session_id=session_id)
+    def handle_clarification_response(
+        self,
+        original_query: str,
+        clarification: str,
+        session_id: str,
+        clarification_count: int = 0
+    ) -> Dict:
+        # 마지막 상태를 복사해서 clarification 주입
+        state = self.last_state.copy()  # type: ignore
+        state["user_query"] = f"{original_query}, 추가 정보: {clarification}"
+        state["clarification_needed"] = False
+        state["clarification_question"] = ""
+        state["needs_user_input"] = False
+        state["clarification_count"] = clarification_count
 
+        logging.debug("▶ handle_clarification_response in state: %r", state)
+        try:
+            new_state = self.graph.invoke(state)
+            self.last_state = new_state
+            return {
+                "clarification_question": new_state.get("clarification_question", ""),
+                "response": new_state.get("final_output", ""),
+                "needs_user_input": new_state.get("needs_user_input", False),
+                "is_complete": new_state.get("is_complete", True),
+                "session_id": session_id,
+                "sql_query": new_state.get("sql_query", ""),
+                "sql_attempts": new_state.get("sql_attempts", 0),
+                "clarification_count": new_state.get("clarification_count", 0),
+            }
+        except Exception as e:
+            logging.error("handle_clarification_response error:\n%s", traceback.format_exc())
+            return {
+                "response": f"처리 중 오류가 발생했습니다: {e}",
+                "needs_user_input": False,
+                "is_complete": True,
+                "session_id": session_id,
+                "sql_query": "",
+                "sql_attempts": 0,
+                "clarification_count": clarification_count,
+            }
 
+'''
 class FinanceAgentInterface:
     def __init__(self):
         self.framework = FinanceAgent()
@@ -235,17 +269,24 @@ class FinanceAgentInterface:
                 if not user_input:
                     continue
 
-                result = self.framework.process_query(user_input, self.current_session_id)
+                result = self.framework.process_query(user_input, self.current_session_id)  
+                response = result['response'] if result['response'] else result.get("clarification_question")
                 self.current_session_id = result["session_id"]
-                print(f"🤖: {result['response']}")
+                # clarification 질문이거나 최종 답변이거나, response 에 담긴 텍스트를 항상 출력
+                print(f"🤖: {response}")
 
                 if result.get("needs_user_input", False):
-                    clarification = input("🤖: 추가 정보를 입력해주세요: ").strip()
+                    # 실제 모델이 생성한 clarification_question 사용
+                    cq = result.get("clarification_question", "").strip()
+                    clarification = input(f"🤖: {cq}\n🧑: ").strip()
                     if clarification:
                         clarified = self.framework.handle_clarification_response(
-                            user_input, clarification, self.current_session_id,
+                            user_input,
+                            clarification,
+                            self.current_session_id,
                             clarification_count=result.get("clarification_count", 0)
                         )
+                        self.current_session_id = clarified["session_id"]
                         print(f"🤖: {clarified['response']}")
 
                 if result.get("sql_query"):
@@ -257,9 +298,56 @@ class FinanceAgentInterface:
                 break
             except Exception as e:
                 print(f"오류: {e}")
+'''
 
+class FinanceAgentInterface:
+    def __init__(self):
+        self.framework = FinanceAgent()
+        self.current_session_id = None
 
+    def run_once(self, question: str) -> dict:
+        """단일 질문을 처리하고 응답 반환"""
+        try:
+            result = self.framework.process_query(question, self.current_session_id)  
+            response = result['response'] or result.get("clarification_question")
+            self.current_session_id = result["session_id"]
+
+            if result.get("needs_user_input", False):
+                # 클라이언트가 후속 clarification을 따로 보내야 함
+                return {
+                    "response": response,
+                    "needs_clarification": True,
+                    "session_id": self.current_session_id,
+                    "clarification_question": result.get("clarification_question"),
+                    "clarification_count": result.get("clarification_count", 0)
+                }
+
+            return {
+                "response": response,
+                "sql_query": result.get("sql_query"),
+                "sql_attempts": result.get("sql_attempts"),
+                "session_id": self.current_session_id
+            }
+
+        except Exception as e:
+            return {"error": str(e)}
+
+    def answer_clarification(self, original_question: str, clarification: str, clarification_count: int = 0) -> dict:
+        """clarification 응답 처리"""
+        try:
+            clarified = self.framework.handle_clarification_response(
+                original_question,
+                clarification,
+                self.current_session_id,
+                clarification_count
+            )
+            self.current_session_id = clarified["session_id"]
+            return {
+                "response": clarified['response'],
+                "session_id": self.current_session_id
+            }
+        except Exception as e:
+            return {"error": str(e)}
 
 if __name__ == "__main__":
-    interface = FinanceAgentInterface()
-    interface.start_conversation()
+    FinanceAgentInterface().start_conversation()

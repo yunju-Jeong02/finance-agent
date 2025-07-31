@@ -1,0 +1,39 @@
+2025-07-31 17:50:36,601 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-07-31 17:50:36,820 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-07-31 17:50:56,877 - DailyStockUpdater - ERROR - 최신 날짜 조회 실패: 'str' object has no attribute 'strftime'
+2025-07-31 17:50:56,883 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-01 ~ 2025-07-31
+2025-07-31 17:50:56,884 - DailyStockUpdater - ERROR - 업데이트 실패: DailyStockUpdater.fetch_all_stocks_data() missing 1 required positional argument: 'end_date'
+2025-07-31 17:50:56,891 - DailyStockUpdater - INFO - 엔진 종료
+2025-07-31 17:52:27,249 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-07-31 17:52:28,320 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-07-31 17:52:45,995 - DailyStockUpdater - ERROR - 최신 날짜 조회 실패: 'str' object has no attribute 'strftime'
+2025-07-31 17:52:45,995 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-01 ~ 2025-07-31
+2025-07-31 17:52:45,995 - DailyStockUpdater - ERROR - 업데이트 실패: DailyStockUpdater.fetch_all_stocks_data() missing 1 required positional argument: 'end_date'
+2025-07-31 17:52:45,999 - DailyStockUpdater - INFO - 엔진 종료
+2025-07-31 18:00:37,265 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-07-31 18:00:37,644 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-07-31 18:00:53,614 - DailyStockUpdater - ERROR - 최신 날짜 조회 실패: 'str' object has no attribute 'strftime'
+2025-07-31 18:00:53,625 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-01 ~ 2025-07-31
+2025-07-31 18:03:46,823 - DailyStockUpdater - INFO - 기술적 지표 계산 시작
+2025-07-31 18:03:46,824 - DailyStockUpdater - ERROR - 업데이트 실패: 'Date'
+2025-07-31 18:03:46,842 - DailyStockUpdater - INFO - 엔진 종료
+2025-07-31 18:06:43,034 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-07-31 18:06:43,299 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-07-31 18:07:01,210 - DailyStockUpdater - ERROR - 최신 날짜 조회 실패: 'str' object has no attribute 'strftime'
+2025-07-31 18:07:01,210 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-01 ~ 2025-07-31
+2025-07-31 18:09:17,824 - DailyStockUpdater - INFO - 기술적 지표 계산 시작
+2025-07-31 18:09:22,617 - DailyStockUpdater - ERROR - 업데이트 실패: unsupported operand type(s) for /: 'str' and 'str'
+2025-07-31 18:09:22,642 - DailyStockUpdater - INFO - 엔진 종료
+2025-07-31 18:13:30,798 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-07-31 18:13:31,138 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-07-31 18:13:46,997 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-10 ~ 2025-07-31
+2025-07-31 18:15:37,009 - DailyStockUpdater - INFO - 기술적 지표 계산 시작
+2025-07-31 18:17:30,384 - DailyStockUpdater - INFO - 기술적 지표 계산 완료
+2025-07-31 18:17:34,667 - DailyStockUpdater - INFO - 데이터베이스 저장 완료: 39645개 레코드
+2025-07-31 18:17:34,668 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 완료 ===
+2025-07-31 18:17:34,669 - DailyStockUpdater - INFO - 엔진 종료
+2025-07-31 18:18:06,564 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-07-31 18:18:06,852 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-07-31 18:18:26,125 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-31 ~ 2025-07-31
+2025-07-31 18:20:14,592 - DailyStockUpdater - WARNING - 수집된 데이터가 없습니다.
+2025-07-31 18:20:14,593 - DailyStockUpdater - INFO - 엔진 종료

@@ -9,7 +9,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from finance_agent.agent import FinanceAgentInterface
 
-
 def main():
     """Graph Framework 실행"""
     try:   

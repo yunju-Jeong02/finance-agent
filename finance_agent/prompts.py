@@ -13,7 +13,7 @@ output:
 ```json
 {{
     "clarification_needed": true,
-    "clarification_question": '최근'이라는 표현은 모호합니다. 혹시 어떤 날짜 범위를 말씀하시는 걸까요?
+    "clarification_question": "최근이라는 표현은 모호합니다. 혹시 어떤 날짜 범위를 말씀하시는 걸까요?"
 }}
 ```
 사용자 질문: 고점 대비 많이 떨어진 주식을 알려줘.
@@ -21,7 +21,7 @@ output:
 ```json
 {{
     "clarification_needed": true,
-    "clarification_question": '고점 대비'라는 표현은 모호합니다. 어떤 기간의 고점을 기준으로 말씀하시는 건가요?
+    "clarification_question": "고점 대비라는 표현은 모호합니다. 어떤 기간의 고점을 기준으로 말씀하시는 건가요?"
 }}
 ```
 사용자 질문: 특정 주식의 최근 동향을 알고 싶어요.
@@ -29,7 +29,7 @@ output:
 ```json
 {{
     "clarification_needed": true,
-    "clarification_question": '해당 표현은 모호합니다. 종목, 기간, 원하는 정보(예: 주가, 거래량 등)를 구체적으로 말씀해 주세요.
+    "clarification_question": "해당 표현은 모호합니다. 종목, 기간, 원하는 정보(예: 주가, 거래량 등)를 구체적으로 말씀해 주세요."
 }}
 ```
 사용자 질문: 2024-12-12에 거래량이 전날대비 500% 이상 증가한 종목을 모두 보여줘

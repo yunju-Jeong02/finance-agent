@@ -18,7 +18,7 @@ from config.config import Config
 
 
 class DailyStockUpdater:
-    """매일 주가 데이터를 업데이트하는 클래스"""
+    """매일 주가 데이터를 업데이트"""
     
     def __init__(self):
         self.config = Config()
@@ -28,7 +28,6 @@ class DailyStockUpdater:
         self.tickers_df = None
         
     def _setup_logger(self) -> logging.Logger:
-        """로거 설정"""
         logger = logging.getLogger('DailyStockUpdater')
         logger.setLevel(logging.INFO)
         
@@ -53,7 +52,6 @@ class DailyStockUpdater:
         return logger
     
     def _create_engine(self):
-        """SQLAlchemy 엔진 생성"""
         try:
             connection_string = (
                 f"mysql+pymysql://{self.config.MYSQL_USER}:{self.config.MYSQL_PASSWORD}@"
@@ -90,7 +88,6 @@ class DailyStockUpdater:
             if self.tickers_df.empty:
                 # 파일에서 종목 코드 가져오기 (fallback)
                 self.tickers_df = pd.read_csv("./data/stock/krx_tickers.csv")
-                self.tickers_df.rename(columns={"회사명": "company_name"}, inplace=True)
             
             self.logger.info(f"종목 코드 로드 완료: {len(self.tickers_df)}개 종목")
             return self.tickers_df
@@ -114,89 +111,141 @@ class DailyStockUpdater:
         except Exception as e:
             self.logger.error(f"최신 날짜 조회 실패: {e}")
             return None
-    
-    def fetch_stock_data(self, ticker: str, start_date: str, end_date: str) -> Optional[pd.DataFrame]:
-        """개별 종목 데이터 가져오기"""
-        try:
-            # yfinance를 사용하여 데이터 가져오기
-            df = yf.download(ticker, start=start_date, end=end_date, interval="1d", auto_adjust=False, progress=False)
-            
-            if df.empty:
-                return None
-            
-            # 데이터 정리
-            df.columns = [f"{col[0]}_{col[1]}" for col in df.columns]
-            df = df.reset_index()
-            df.columns = ['date', 'adj_close', 'close', 'high', 'low', 'open', 'volume']
-            df['ticker'] = ticker
-            df['date'] = pd.to_datetime(df['date']).dt.date
-            return df
-            
-        except Exception as e:
-            self.logger.warning(f"종목 {ticker} 데이터 가져오기 실패: {e}")
-            return None
         
-    def fetch_all_stocks_data(self, ticker_list: List, start_date: str, end_date: str) -> Optional[pd.DataFrame]:
-        """종목list에 대하여 주가 데이터 가져오기"""
+    def _chunk(self, seq, size):
+        for i in range(0, len(seq), size):
+            yield seq[i:i+size]
+
+    def _download_with_retries(self, tickers, start_date, end_date, max_retries=3, retry_delay=3):
+        """yfinance 멀티/단일 혼합 재시도 로직"""
+        all_frames = []
+        failed = list(tickers)
+
+        for attempt in range(1, max_retries + 1):
+            if not failed:
+                break
+            self.logger.info(f"[다운로드 재시도] {attempt}/{max_retries} | 대기 티커: {len(failed)}")
+
+            still_failed = []
+
+            # 1) 먼저 여러 개를 한꺼번에(배치) 시도 → 속도 ↑
+            for batch in self._chunk(failed, 50):  # 배치 크기는 상황에 맞게 조정
+                try:
+                    df = yf.download(batch, start=start_date, end=end_date, interval="1d", auto_adjust=False, progress=False)
+                    if df.empty:
+                        # 멀티 통째로 실패 시, 개별로 다시 시도하도록 남겨둠
+                        still_failed.extend(batch)
+                        continue
+
+                    # 멀티 결과 tidy
+                    tidy = (
+                        df.stack(level=1, future_stack=True)
+                        .reset_index()
+                        .rename(columns={
+                            "Ticker": "ticker",
+                            "Date": "date",
+                            "Adj Close": "adj_close",
+                            "Close": "close",
+                            "High": "high",
+                            "Low": "low",
+                            "Open": "open",
+                            "Volume": "volume"
+                        })
+                        [["date", "ticker", "adj_close", "close", "high", "low", "open", "volume"]]
+                    )
+                    tidy["date"] = pd.to_datetime(tidy["date"]).dt.date
+
+                    # 배치 내 개별 티커 중 일부가 비어 있을 수 있으니, 비어있는 티커만 남김
+                    got_tickers = set(tidy["ticker"].unique())
+                    missing = [t for t in batch if t not in got_tickers]
+                    still_failed.extend(missing)
+
+                    if not tidy.empty:
+                        all_frames.append(tidy)
+
+                except Exception as e:
+                    self.logger.warning(f"[배치 실패] {batch[:3]}... 외 {len(batch)}개 | {e}")
+                    # 배치 전체를 개별 재시도로 넘김
+                    still_failed.extend(batch)
+
+                time.sleep(0.5)  # 과도한 호출 방지
+
+            # 2) 배치에서 놓친 티커를 개별로 시도
+            if still_failed:
+                indiv_remaining = []
+                for t in still_failed:
+                    try:
+                        df = yf.download(t, start=start_date, end=end_date, interval="1d", auto_adjust=False, progress=False)
+                        if df.empty:
+                            self.logger.info(f"[개별 실패: empty] {t}")
+                            indiv_remaining.append(t)
+                            continue
+                        df = df.reset_index()
+                        df["ticker"] = t
+                        df = df.rename(columns={
+                            "Date": "date",
+                            "Adj Close": "adj_close",
+                            "Close": "close",
+                            "High": "high",
+                            "Low": "low",
+                            "Open": "open",
+                            "Volume": "volume"
+                        })[["date", "ticker", "adj_close", "close", "high", "low", "open", "volume"]]
+                        df["date"] = pd.to_datetime(df["date"]).dt.date
+                        all_frames.append(df)
+                    except Exception as e:
+                        self.logger.info(f"[개별 실패] {t} | {e}")
+                        indiv_remaining.append(t)
+                    time.sleep(0.3)
+                failed = indiv_remaining
+            else:
+                failed = []
+
+            if failed:
+                self.logger.info(f"[재시도 대기] 남은 {len(failed)}개 | {retry_delay}s")
+                time.sleep(retry_delay)
+
+        result = pd.concat(all_frames, ignore_index=True) if all_frames else pd.DataFrame(
+            columns=["date", "ticker", "adj_close", "close", "high", "low", "open", "volume"]
+        )
+        return result, failed
+
+    def fetch_stocks_data(self, ticker_list: List, start_date: str, end_date: str) -> Optional[pd.DataFrame]:
+        """재시도/배치 포함 다운로드 래퍼"""
         try:
-            df = yf.download(ticker_list, start=start_date, end=end_date, interval="1d", auto_adjust=False)
-            
-            df_tidy = df.stack(level=1, future_stack=True).reset_index()
-
-            # 컬럼명 정리
-            df_tidy = df_tidy.rename(columns={"Ticker": "ticker",
-                                                "Date": "date",
-                                                "Adj Close": "adj_close",
-                                                "Close": "close",
-                                                "High": "high",
-                                                "Low": "low",
-                                                "Open": "open",
-                                                "Volume": "volume"
-                                              })
-
-            # 3. 컬럼 순서 조정 (원하는 순서로)
-            df_tidy.columns = ['date', 'adj_close', 'close', 'high', 'low', 'open', 'volume', 'ticker']
-            df_tidy['date'] = pd.to_datetime(df_tidy['date']).dt.date
-            return df_tidy
+            df, failed = self._download_with_retries(ticker_list, start_date, end_date)
+            if failed:
+                self.logger.warning(f"최종 실패 티커 수: {len(failed)} | 예: {failed[:5]}")
+            return df
         except Exception as e:
             self.logger.error(f"종목 데이터 가져오기 실패: {e}")
             return None
-    
-    # def fetch_all_stocks_data(self, start_date: str, end_date: str) -> pd.DataFrame:
-    #     """모든 종목 데이터 가져오기"""
-    #     all_data = []
-    #     total_tickers = len(self.tickers_df)
         
-    #     self.logger.info(f"데이터 수집 시작: {start_date} ~ {end_date}")
+    # def fetch_stocks_data(self, ticker_list: List, start_date: str, end_date: str) -> Optional[pd.DataFrame]:
+    #     """종목list에 대하여 주가 데이터 가져오기"""
+    #     try:
+    #         df = yf.download(ticker_list, start=start_date, end=end_date, interval="1d", auto_adjust=False)
+            
+    #         df_tidy = df.stack(level=1, future_stack=True).reset_index()
 
-    #     ticker_list = self.tickers_df['ticker'].tolist()
-        
-        
-    #     for idx, row in self.tickers_df.iterrows():
-    #         ticker = row['ticker']
-    #         company_name = row['company_name']
-            
-    #         # 진행률 표시
-    #         if idx % 50 == 0:
-    #             self.logger.info(f"진행률: {idx}/{total_tickers} ({idx/total_tickers*100:.1f}%)")
-            
-    #         # 데이터 가져오기
-    #         stock_data = self.fetch_stock_data(ticker, start_date, end_date)
-            
-    #         if stock_data is not None:
-    #             stock_data['company_name'] = company_name
-    #             all_data.append(stock_data)
-            
-    #         # API 호출 제한을 위한 딜레이
-    #         time.sleep(0.1)
-        
-    #     if all_data:
-    #         combined_df = pd.concat(all_data, ignore_index=True)
-    #         self.logger.info(f"데이터 수집 완료: {len(combined_df)}개 레코드")
-    #         return combined_df
-    #     else:
-    #         self.logger.warning("수집된 데이터가 없습니다.")
-    #         return pd.DataFrame()
+    #         # 컬럼명 정리
+    #         df_tidy = df_tidy.rename(columns={"Ticker": "ticker",
+    #                                             "Date": "date",
+    #                                             "Adj Close": "adj_close",
+    #                                             "Close": "close",
+    #                                             "High": "high",
+    #                                             "Low": "low",
+    #                                             "Open": "open",
+    #                                             "Volume": "volume"
+    #                                           })
+
+    #         # 3. 컬럼 순서 조정 (원하는 순서로)
+    #         df_tidy.columns = ['date', 'ticker', 'adj_close', 'close', 'high', 'low', 'open', 'volume']
+    #         df_tidy['date'] = pd.to_datetime(df_tidy['date']).dt.date
+    #         return df_tidy
+    #     except Exception as e:
+    #         self.logger.error(f"종목 데이터 가져오기 실패: {e}")
+    #         return None
     
     def compute_technical_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
         """기술적 지표 계산 (기존 upload.py 코드 참조)"""
@@ -206,7 +255,7 @@ class DailyStockUpdater:
         self.logger.info("기술적 지표 계산 시작")
         
         # 날짜순 정렬
-        df = df.sort_values(by=["ticker", "Date"]).copy()
+        df = df.sort_values(by=["ticker", "date"]).copy()
         
         # 등락률 계산
         df["price_change_pct"] = df.groupby("ticker")["adj_close"].pct_change() * 100
@@ -218,8 +267,8 @@ class DailyStockUpdater:
         df["ma_60"] = df.groupby("ticker")["adj_close"].transform(lambda x: x.rolling(60).mean())
         
         # 거래량 평균
-        df["ma_VOL_20"] = df.groupby("ticker")["volume"].transform(lambda x: x.rolling(20).mean())
-        df["volume_Ratio_20"] = df["volume"] / (df["ma_VOL_20"] + 1e-6)
+        df["ma_vol_20"] = df.groupby("ticker")["volume"].transform(lambda x: x.rolling(20).mean())
+        df["volume_ratio_20"] = df["volume"] / (df["ma_vol_20"] + 1e-6)
         
         # RSI 계산
         def calc_rsi(series, period=14):
@@ -278,20 +327,20 @@ class DailyStockUpdater:
     def get_update_date_range(self) -> tuple:
         """업데이트할 날짜 범위 계산"""
         latest_date = self.get_latest_date_in_db()
-        today = datetime.now().date()
+        yesterday = (datetime.now() - timedelta(days=1)).date()
         
         if latest_date:
-            # 최신 날짜 다음날부터 오늘까지
+            # 최신 날짜 다음날부터 어제까지
             start_date = (datetime.strptime(latest_date, '%Y-%m-%d') + timedelta(days=1)).date()
         else:
-            # 데이터가 없으면 30일 전부터
-            start_date = today - timedelta(days=30)
+            # 데이터가 없으면 1년 전부터
+            start_date = yesterday  - timedelta(days=365)
         
         # 시작일이 오늘 이후면 업데이트 불필요
-        if start_date > today:
+        if start_date > yesterday:
             return None, None
         
-        return start_date.strftime('%Y-%m-%d'), today.strftime('%Y-%m-%d')
+        return start_date.strftime('%Y-%m-%d'), yesterday .strftime('%Y-%m-%d')
     
     def update_daily_data(self):
         """매일 주가 데이터 업데이트"""
@@ -301,6 +350,9 @@ class DailyStockUpdater:
             # 1. 종목 코드 로드
             self.load_tickers()
             
+            ticker_list = self.tickers_df['ticker'].tolist()
+            ticker_list = list(set(ticker_list))  # 중복 제거
+            
             # 2. 업데이트 날짜 범위 계산
             start_date, end_date = self.get_update_date_range()
             
@@ -309,9 +361,9 @@ class DailyStockUpdater:
                 return
             
             self.logger.info(f"업데이트 날짜 범위: {start_date} ~ {end_date}")
-            
+
             # 3. 데이터 수집
-            stock_data = self.fetch_all_stocks_data(start_date, end_date)
+            stock_data = self.fetch_stocks_data(ticker_list, start_date, end_date)
             
             if stock_data.empty:
                 self.logger.warning("수집된 데이터가 없습니다.")
@@ -329,13 +381,14 @@ class DailyStockUpdater:
             self.logger.error(f"업데이트 실패: {e}")
             raise e
     
-    def force_update_all_data(self, days: int = 30):
+    def force_update_all_data(self, days: int = 365):
         """전체 데이터 강제 업데이트"""
         try:
             self.logger.info(f"=== 전체 데이터 강제 업데이트 시작 ({days}일) ===")
             
             # 1. 종목 코드 로드
             self.load_tickers()
+            ticker_list = list(set(self.tickers_df["ticker"].tolist()))
             
             # 2. 날짜 범위 설정
             end_date = datetime.now().date()
@@ -344,11 +397,12 @@ class DailyStockUpdater:
             # 3. 기존 데이터 삭제
             if self.engine:
                 with self.engine.connect() as conn:
-                    conn.execute(f"DELETE FROM krx_stockprice WHERE Date >= '{start_date}'")
+                    conn.execute(f"DELETE FROM krx_stockprice WHERE date >= '{start_date}'")
                     conn.commit()
             
             # 4. 데이터 수집
-            stock_data = self.fetch_all_stocks_data(
+            stock_data = self.fetch_stocks_data(
+                ticker_list,
                 start_date.strftime('%Y-%m-%d'),
                 end_date.strftime('%Y-%m-%d')
             )

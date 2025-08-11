@@ -22,22 +22,17 @@ class GraphState(TypedDict):
     clarification_question: str
     clarification_count: int
     needs_user_input: bool
-
     parsed_query: str
-
     sql_query: str
     sql_attempts: int
     sql_error: str
-
     query_results: List[Dict]
     final_output: str
-
     is_complete: bool
 
 
 class FinanceAgent:
     """ graph framework using separated nodes"""
-    
     def __init__(self):
         # Initialize nodes
         self.input_node = InputNode()
@@ -104,41 +99,26 @@ class FinanceAgent:
         return workflow.compile()
     
     def input_handler(self, state: GraphState) -> GraphState:
-        """Handle input using input node"""
         return self.input_node.process(state)
     
     def query_parser(self, state: GraphState) -> GraphState:
-        """Parse query using query parser node"""
         return self.query_parser_node.process(state)
     
     def sql_generator(self, state: GraphState) -> GraphState:
-        """Generate SQL using sql generator node"""
         return self.sql_generator_node.process(state)
     
     def sql_refiner(self, state: GraphState) -> GraphState:
-        """Refine SQL using sql refiner node"""
         return self.sql_refiner_node.process(state)
     
     def output_formatter(self, state: GraphState) -> GraphState:
-        """Format output using output formatter node"""
         return self.output_formatter_node.process(state)
     
     def route_after_input(self, state: GraphState) -> str:
         if state["clarification_needed"]:
-            # clarification 시도 횟수 2회 미만만 되묻기
-            if state.get("clarification_count", 0) < 2:
-                state["is_complete"] = False
-                state["needs_user_input"] = True
-                state["clarification_count"] = state.get("clarification_count", 0) + 1
-                return "input_handler" # 로 보내기..
-            else:
-                # 2회 이상이면 중단/안내 메시지
-                state["final_output"] = "정보가 부족하여 질문을 이해하지 못했습니다. 더 구체적으로 질문해 주세요."
-                state["is_complete"] = True
-                state["needs_user_input"] = False
-                return "end"
-        else:
-            return "query_parser"
+            state["is_complete"] = False
+            state["needs_user_input"] = True
+            return "end"
+        return "query_parser"
         
     def route_after_query_parser(self, state: GraphState) -> str:
         if state.get("is_complete", False):
@@ -159,8 +139,7 @@ class FinanceAgent:
         else:
             return "format"
     
-    def process_query(self, user_query: str, session_id: str = None) -> Dict:
-        """Process user query through  framework"""
+    def process_query(self, user_query: str, session_id: str = None, clarification_count: int = 0) -> Dict:
         if session_id is None:
             session_id = str(uuid.uuid4())
         
@@ -168,7 +147,7 @@ class FinanceAgent:
             "user_query": user_query,
             "session_id": session_id,
             "clarification_needed": False,
-            "clarification_count": 0, 
+            "clarification_count": clarification_count,
             "clarification_question": "",
             "needs_user_input": False,
             "parsed_query": {},
@@ -192,6 +171,7 @@ class FinanceAgent:
                 "session_id": session_id,
                 "sql_query": result.get("sql_query", ""),
                 "sql_attempts": result.get("sql_attempts", 0),
+                "clarification_count": result.get("clarification_count", clarification_count)
             }
             
         except Exception as e:
@@ -202,16 +182,8 @@ class FinanceAgent:
                 "session_id": session_id,
                 "sql_query": "",
                 "sql_attempts": 0,
+                "clarification_count": clarification_count
             }
-    
-    def handle_clarification_response(self, original_query, clarification, session_id, clarification_count=0):
-        combined_query = f"사용자 질문: {original_query}, 추가 정보: {clarification}"
-        return self.process_query(
-            combined_query, 
-            session_id=session_id,
-            clarification_count=clarification_count
-        )
-
 
 class FinanceAgentInterface:
     """Interface for graph framework"""
@@ -220,10 +192,12 @@ class FinanceAgentInterface:
         self.current_session_id = None
     
     def start_conversation(self):
-        """Start conversation with  framework"""
+        """Start conversation with the framework"""
         print("=== KU-gent ===")
-        print("한국 주식 데이터에 대해 질문해보세요.'quit'를 입력하면 종료됩니다.\n")
+        print("한국 주식 데이터에 대해 질문해보세요. 'quit'를 입력하면 종료됩니다.\n")
         
+        clarification_count = 0  # 인터페이스에서 관리
+
         while True:
             try:
                 user_input = input("🧑: ").strip()
@@ -236,21 +210,37 @@ class FinanceAgentInterface:
                     continue
                 
                 # Process query
-                result = self.framework.process_query(user_input, self.current_session_id)
+                result = self.framework.process_query(
+                    user_input,
+                    self.current_session_id,
+                    clarification_count=clarification_count
+                )
                 self.current_session_id = result["session_id"]
                 
+                # 출력할 응답
                 response = result['response'] if result['response'] else result.get("clarification_question")
                 print(f"🤖: {response}")
 
-                # Handle clarification if needed
+                # Clarification 필요 시
                 if result.get("needs_user_input", False):
-                    clarification = input("🤖: 추가 정보를 입력해주세요: ").strip()
-                    if clarification:
-                        clarified_result = self.framework.handle_clarification_response(
-                            user_input, clarification, self.current_session_id, clarification_count=result.get("clarification_count", 0)
-                        )
-                        print(f"🤖: {clarified_result['response']}")
-                
+                    if clarification_count < 2:
+                        clarification = input("🤖: 추가 정보를 입력해주세요: ").strip()
+                        if clarification:
+                            clarification_count += 1  # 카운트 증가
+                            clarified_result = self.framework.process_query(
+                                f"사용자 질문: {user_input}, 추가 정보: {clarification}",
+                                session_id=self.current_session_id,
+                                clarification_count=clarification_count
+                            )
+                            print(f"🤖: {clarified_result['response']}")
+                        else:
+                            print("🤖: 추가 정보가 없어 대화를 종료합니다.")
+                            break
+                    else:
+                        # 이미 2회 요청했으면 종료
+                        print("🤖: 정보가 부족하여 질문을 이해하지 못했습니다. 다시 질문해 주세요.")
+                        break
+
                 # Debug info
                 if result.get("sql_query"):
                     print(f"[SQL] {result['sql_query']}")

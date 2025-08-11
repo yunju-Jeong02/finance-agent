@@ -33,7 +33,6 @@ class DatabaseManager:
             raise e
     
     def execute_query(self, query: str, params: Optional[List] = None) -> List[Dict]:
-        """Execute SQL query and return results as list of dictionaries"""
         if not self.connection:
             self.connect()
         
@@ -47,7 +46,6 @@ class DatabaseManager:
             
             results = cursor.fetchall()
             
-            # Convert any Decimal or datetime objects to appropriate types
             formatted_results = []
             for row in results:
                 formatted_row = {}
@@ -80,8 +78,7 @@ class DatabaseManager:
         FROM INFORmaTION_SCHEma.COLUMNS
         WHERE TABLE_SCHEma = %s AND TABLE_NAME = 'krx_stockprice'
         ORDER BY ORDINAL_POSITION
-        """
-        
+        """ 
         try:
             results = self.execute_query(query, [self.config.MYSQL_DATABASE])
             

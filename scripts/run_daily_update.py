@@ -13,7 +13,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from finance_agent.updater import DailyStockUpdater
 
-
 def run_daily_update():
     """매일 업데이트 실행"""
     print("=== 매일 주가 데이터 업데이트 시작 ===")
@@ -35,7 +34,6 @@ def run_daily_update():
     finally:
         updater.close_connection()
 
-
 def run_force_update(days: int = 30):
     """전체 데이터 강제 업데이트"""
     print(f"=== 전체 데이터 강제 업데이트 시작 ({days}일) ===")
@@ -56,7 +54,6 @@ def run_force_update(days: int = 30):
     
     finally:
         updater.close_connection()
-
 
 def main():
     """메인 실행 함수"""

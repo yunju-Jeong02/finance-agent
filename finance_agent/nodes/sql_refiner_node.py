@@ -1,5 +1,5 @@
 """
-SQL Refiner Node
+SQL Refiner Node : CM
 Refines SQL queries when they fail (max 3 attempts)
 """
 
@@ -12,17 +12,12 @@ from finance_agent.llm import LLM
 from finance_agent.prompts import sql_refinement_prompt as prompt
 
 
-
-
 class SqlRefinerNode:
-    """Node for refining SQL queries"""
-    
     def __init__(self):
         self.llm = LLM()
         self.db_manager = DatabaseManager()
     
     def process(self, state: Dict) -> Dict:
-        """Refine SQL query if there was an error"""
         if state["sql_attempts"] >= 3:
             state["final_output"] = "쿼리 실행에 실패했습니다."
             state["is_complete"] = True
@@ -41,7 +36,7 @@ class SqlRefinerNode:
                 latest_date=latest_date
             ))
             
-            refined_query = self._clean_sql(response)
+            refined_query = self._parse_sql(response)
             state["sql_query"] = refined_query
             state["sql_attempts"] += 1
             
@@ -59,8 +54,7 @@ class SqlRefinerNode:
         
         return state
     
-    def _clean_sql(self, sql_text: str) -> str:
-        """Clean SQL query text"""
+    def _parse_sql(self, sql_text: str) -> str:
         # '''sql, ```sql, ``` 등 다양한 포맷 모두 제거
         sql_query = sql_text.strip()
         sql_query = re.sub(r"(```sql|'''sql)", "", sql_query, flags=re.IGNORECASE)
@@ -68,7 +62,6 @@ class SqlRefinerNode:
         return sql_query.strip()
     
     def _get_latest_available_date(self) -> str:
-        """Get latest available date from database"""
         try:
             dates = self.db_manager.get_available_dates(1)
             return dates[0] if dates else "2025-07-09"

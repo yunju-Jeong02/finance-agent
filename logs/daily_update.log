@@ -37,3 +37,96 @@
 2025-07-31 18:18:26,125 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-31 ~ 2025-07-31
 2025-07-31 18:20:14,592 - DailyStockUpdater - WARNING - 수집된 데이터가 없습니다.
 2025-07-31 18:20:14,593 - DailyStockUpdater - INFO - 엔진 종료
+2025-08-06 20:33:43,911 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-06 20:33:44,361 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-08-06 20:34:04,393 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-08-06 ~ 2025-08-06
+2025-08-06 20:37:09,097 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-06 20:37:09,438 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-08-06 20:37:27,273 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-08-06 ~ 2025-08-06
+2025-08-06 20:39:55,891 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-06 20:39:56,455 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-08-06 20:40:26,757 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-08-06 ~ 2025-08-06
+2025-08-06 20:48:21,252 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-06 20:48:21,690 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-08-06 20:48:39,865 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-08-06 ~ 2025-08-06
+2025-08-06 21:32:23,329 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-06 21:32:23,747 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-08-06 21:32:46,743 - DailyStockUpdater - ERROR - 업데이트 실패: '>' not supported between instances of 'str' and 'datetime.date'
+2025-08-06 21:32:46,746 - DailyStockUpdater - INFO - 엔진 종료
+2025-08-06 21:34:36,848 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-06 21:34:37,239 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-08-06 21:34:55,266 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-11 ~ 2025-07-12
+2025-08-06 22:06:27,940 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-06 22:06:28,422 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-08-06 22:06:49,291 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-11 ~ 2025-07-12
+2025-08-06 22:09:20,107 - DailyStockUpdater - INFO - 기술적 지표 계산 시작
+2025-08-06 22:09:24,770 - DailyStockUpdater - INFO - 기술적 지표 계산 완료
+2025-08-06 22:09:25,245 - DailyStockUpdater - INFO - 데이터베이스 저장 완료: 2643개 레코드
+2025-08-06 22:09:25,245 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 완료 ===
+2025-08-06 22:09:25,245 - DailyStockUpdater - INFO - 엔진 종료
+2025-08-06 22:25:00,505 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-06 22:25:02,842 - DailyStockUpdater - ERROR - 종목 코드 로드 실패: 'market_division'
+2025-08-06 22:25:02,842 - DailyStockUpdater - ERROR - 업데이트 실패: 'market_division'
+2025-08-06 22:25:02,858 - DailyStockUpdater - INFO - 엔진 종료
+2025-08-06 22:26:28,587 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-06 22:26:28,902 - DailyStockUpdater - ERROR - 종목 코드 로드 실패: 'market_division'
+2025-08-06 22:26:28,902 - DailyStockUpdater - ERROR - 업데이트 실패: 'market_division'
+2025-08-06 22:26:28,912 - DailyStockUpdater - INFO - 엔진 종료
+2025-08-06 22:26:40,481 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-06 22:26:40,775 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-08-06 22:26:58,158 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-14 ~ 2025-07-14
+2025-08-06 22:29:00,565 - DailyStockUpdater - WARNING - 수집된 데이터가 없습니다.
+2025-08-06 22:29:00,566 - DailyStockUpdater - INFO - 엔진 종료
+2025-08-06 22:35:05,574 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-06 22:35:06,064 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-08-06 22:35:24,490 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-14 ~ 2025-07-14
+2025-08-06 22:37:34,321 - DailyStockUpdater - WARNING - 수집된 데이터가 없습니다.
+2025-08-06 22:37:34,323 - DailyStockUpdater - INFO - 엔진 종료
+2025-08-06 22:39:08,469 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-06 22:39:08,872 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-08-06 22:39:28,538 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-14 ~ 2025-07-14
+2025-08-06 22:41:38,365 - DailyStockUpdater - WARNING - 수집된 데이터가 없습니다.
+2025-08-06 22:41:38,366 - DailyStockUpdater - INFO - 엔진 종료
+2025-08-06 22:42:25,125 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-06 22:42:25,535 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-08-06 22:42:43,937 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-14 ~ 2025-07-14
+2025-08-06 22:44:47,272 - DailyStockUpdater - WARNING - 수집된 데이터가 없습니다.
+2025-08-06 22:44:47,273 - DailyStockUpdater - INFO - 엔진 종료
+2025-08-10 15:26:33,072 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-10 15:26:33,306 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-08-10 15:26:56,932 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-14 ~ 2025-07-14
+2025-08-10 15:32:37,296 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-10 15:32:37,652 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-08-10 15:32:54,351 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-14 ~ 2025-07-14
+2025-08-10 15:36:39,733 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-10 15:36:40,143 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-08-10 15:36:56,799 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-14 ~ 2025-07-14
+2025-08-10 15:39:30,323 - DailyStockUpdater - WARNING - 수집된 데이터가 없습니다.
+2025-08-10 15:39:30,327 - DailyStockUpdater - INFO - 엔진 종료
+2025-08-10 15:40:46,820 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-10 15:40:48,560 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-08-10 15:41:06,151 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-14 ~ 2025-07-14
+2025-08-10 15:43:11,098 - DailyStockUpdater - WARNING - 수집된 데이터가 없습니다.
+2025-08-10 15:43:11,100 - DailyStockUpdater - INFO - 엔진 종료
+2025-08-10 15:46:00,443 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-10 15:46:01,171 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-08-10 15:46:17,672 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-14 ~ 2025-07-14
+2025-08-10 15:48:01,482 - DailyStockUpdater - WARNING - 수집된 데이터가 없습니다.
+2025-08-10 15:48:01,483 - DailyStockUpdater - INFO - 엔진 종료
+2025-08-10 15:54:50,715 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-10 15:54:51,008 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-08-10 15:55:08,478 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-14 ~ 2025-07-15
+2025-08-10 15:57:02,363 - DailyStockUpdater - INFO - 기술적 지표 계산 시작
+2025-08-10 15:57:08,023 - DailyStockUpdater - INFO - 기술적 지표 계산 완료
+2025-08-10 15:57:08,562 - DailyStockUpdater - INFO - 데이터베이스 저장 완료: 2643개 레코드
+2025-08-10 15:57:08,563 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 완료 ===
+2025-08-10 15:57:08,564 - DailyStockUpdater - INFO - 엔진 종료
+2025-08-10 16:13:17,884 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-10 16:13:18,229 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-08-10 16:13:38,418 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-14 ~ 2025-07-15
+2025-08-10 16:15:43,402 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-10 16:15:43,772 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2643개 종목
+2025-08-10 16:16:00,124 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-14 ~ 2025-07-15
+2025-08-11 19:03:54,485 - DailyStockUpdater - INFO - === 매일 주가 데이터 업데이트 시작 ===
+2025-08-11 19:03:55,016 - DailyStockUpdater - INFO - 종목 코드 로드 완료: 2758개 종목
+2025-08-11 19:04:10,689 - DailyStockUpdater - INFO - 업데이트 날짜 범위: 2025-07-14 ~ 2025-07-15

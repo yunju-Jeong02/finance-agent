@@ -59,7 +59,11 @@ class QueryParserNode:
             raw_keywords = extract_keywords(query)
             keywords = [
                 kw for kw in raw_keywords
-                if not re.search(r'\d{4}[-./]?\d{1,2}[-./]?\d{0,2}', kw)
+                if not re.search(
+                    r'(\d{4}[-./년\s]?\d{1,2}([-./월\s]?\d{1,2})?)'  # 연도 포함
+                    r'|(\d{1,2}[-./월\s]?\d{1,2}일?)',               # 월-일
+                    kw
+                )
             ]
             print(f"[DEBUG:QueryParserNode] Extracted date: {date}, Keywords: {keywords}")
 

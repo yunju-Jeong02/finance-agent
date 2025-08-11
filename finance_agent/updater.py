@@ -89,7 +89,7 @@ class DailyStockUpdater:
             
             if self.tickers_df.empty:
                 # 파일에서 종목 코드 가져오기 (fallback)
-                self.tickers_df = pd.read_csv("./data/stock/krx_tickers.csv")
+                self.tickers_df = pd.read_csv("./data/krx_tickers.csv") # 경로 수정
                 self.tickers_df.rename(columns={"회사명": "company_name"}, inplace=True)
             
             self.logger.info(f"종목 코드 로드 완료: {len(self.tickers_df)}개 종목")
@@ -137,12 +137,12 @@ class DailyStockUpdater:
         except Exception as e:
             self.logger.warning(f"종목 {ticker} 데이터 가져오기 실패: {e}")
             return None
-        
+
+    '''    
     def fetch_all_stocks_data(self, ticker_list: List, start_date: str, end_date: str) -> Optional[pd.DataFrame]:
         """종목list에 대하여 주가 데이터 가져오기"""
         try:
             df = yf.download(ticker_list, start=start_date, end=end_date, interval="1d", auto_adjust=False)
-            
             df_tidy = df.stack(level=1, future_stack=True).reset_index()
 
             # 컬럼명 정리
@@ -157,8 +157,45 @@ class DailyStockUpdater:
                                               })
 
             # 3. 컬럼 순서 조정 (원하는 순서로)
-            df_tidy.columns = ['date', 'adj_close', 'close', 'high', 'low', 'open', 'volume', 'ticker']
             df_tidy['date'] = pd.to_datetime(df_tidy['date']).dt.date
+            df_tidy = df_tidy[["date", "adj_close", "close", "high", "low", "open", "volume", "ticker"]]
+            return df_tidy
+        except Exception as e:
+            self.logger.error(f"종목 데이터 가져오기 실패: {e}")
+            return None
+    '''
+        
+    # Updated fetch_all_stocks_data method
+
+    def fetch_all_stocks_data(self, ticker_list: List, start_date: str, end_date: str) -> Optional[pd.DataFrame]:
+        """종목list에 대하여 주가 데이터 가져오기"""
+        try:
+            df = yf.download(ticker_list, start=start_date, end=end_date, interval="1d", auto_adjust=False, progress=False)
+
+            if df.empty:
+                self.logger.warning("No data returned from yfinance.")
+                return None
+
+            # MultiIndex 컬럼을 단일 레벨로 변환
+            # 'Adj Close', 'Close', 'Volume' 등의 컬럼을 쉽게 접근하도록 만듭니다.
+            df.columns = df.columns.to_flat_index()
+
+            # 데이터 정리 (컬럼명 재정의)
+            df_tidy = df.stack(level=1).reset_index()
+            df_tidy.columns = ['date', 'ticker', 'value', 'column_type']
+            
+            # 피벗 테이블을 사용하여 각 지표를 별도의 컬럼으로 분리
+            df_tidy = df_tidy.pivot_table(index=['date', 'ticker'], columns='column_type', values='value').reset_index()
+            
+            # 컬럼명 소문자로 변경
+            df_tidy.columns = [c.lower().replace(" ", "_") for c in df_tidy.columns]
+            
+            # 필요한 컬럼만 선택
+            df_tidy = df_tidy[['date', 'adj_close', 'close', 'high', 'low', 'open', 'volume', 'ticker']]
+            
+            # 데이터 타입 변환
+            df_tidy['date'] = pd.to_datetime(df_tidy['date']).dt.date
+            
             return df_tidy
         except Exception as e:
             self.logger.error(f"종목 데이터 가져오기 실패: {e}")
@@ -249,7 +286,8 @@ class DailyStockUpdater:
         
         if latest_date:
             # 최신 날짜 다음날부터 오늘까지
-            start_date = (datetime.strptime(latest_date, '%Y-%m-%d') + timedelta(days=1)).date()
+            start_date = datetime.strptime("2025-07-14", "%Y-%m-%d").date()
+            # start_date = (datetime.strptime(latest_date, '%Y-%m-%d') + timedelta(days=1)).date()
         else:
             # 데이터가 없으면 30일 전부터
             start_date = today - timedelta(days=30)
@@ -270,6 +308,8 @@ class DailyStockUpdater:
             
             # 2. 업데이트 날짜 범위 계산
             start_date, end_date = self.get_update_date_range()
+            end_date = datetime.strptime("2025-07-15", "%Y-%m-%d").date()
+
             
             if not start_date:
                 self.logger.info("업데이트할 데이터가 없습니다.")

@@ -1,8 +1,6 @@
 import json, re
 import logging
 
-# 로깅 포맷 설정 (원하는 레벨로 조정하세요)
-# logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] %(message)s')
 
 def extract_json_from_response(response: str) -> dict:
     """
@@ -27,17 +25,10 @@ def extract_json_from_response(response: str) -> dict:
     # 3) 트레일링 콤마 제거 (예: {"a":1,} → {"a":1})
     json_str = re.sub(r",\s*([}\]])", r"\1", json_str)
 
-    # 4) 디버깅: 정제된 JSON 문자열 출력
-#    logging.debug("Cleaned JSON string:\n%s", json_str)
 
     # 5) 파싱 시도
     try:
         parsed = json.loads(json_str)
-        # 성공 디버깅: 파싱 결과 출력
-#        logging.debug("Parsed JSON object: %r", parsed)
         return parsed
     except json.JSONDecodeError as e:
-        # 실패 디버깅: 오류 메시지와 문제의 JSON 조각 출력
-#        logging.error("JSON parsing failed: %s", e)
-#        logging.error("Offending JSON snippet:\n%s", json_str)
         return {}

@@ -21,7 +21,7 @@ class QueryParserNode:
 
     def lookup_ticker(self, company_name: str) -> str:
         company_name = company_name.strip()
-        ticker_row = self.company_df[self.company_df['회사명'] == company_name]
+        ticker_row = self.company_df[self.company_df['company_name'] == company_name]
         return ticker_row['ticker'].values[0] if not ticker_row.empty else None
 
     def process(self, state: Dict) -> Dict:
@@ -40,7 +40,7 @@ class QueryParserNode:
                         date = datetime.datetime.strptime(date_str, "%Y-%m-%d")
                         date_day = self.get_day_label(date)
                     except ValueError:
-                        print(f"Invalid date format: {date_str}")
+                        # print(f"Invalid date format: {date_str}")
                         date = None
                         date_day = None
             else:

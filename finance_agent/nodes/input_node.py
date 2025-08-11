@@ -17,7 +17,11 @@ class InputNode:
         clarification = self._check_query_clarity(query_history)
         state["clarification_needed"] = clarification["clarification_needed"]
         state["clarification_question"] = clarification["clarification_question"]
-        print(state)
+
+        if state["clarification_needed"]:
+            state["is_complete"] = False
+            state["needs_user_input"] = True
+        # print(state)
         return state
     
     def _check_query_clarity(self, query: str) -> Dict:

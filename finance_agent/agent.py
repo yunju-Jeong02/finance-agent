@@ -20,7 +20,6 @@ class GraphState(TypedDict):
     session_id: str
     clarification_needed: bool
     clarification_question: str
-    clarification_count: int
     needs_user_input: bool
     parsed_query: str
     sql_query: str
@@ -115,8 +114,6 @@ class FinanceAgent:
     
     def route_after_input(self, state: GraphState) -> str:
         if state["clarification_needed"]:
-            state["is_complete"] = False
-            state["needs_user_input"] = True
             return "end"
         return "query_parser"
         
@@ -147,7 +144,6 @@ class FinanceAgent:
             "user_query": user_query,
             "session_id": session_id,
             "clarification_needed": False,
-            "clarification_count": clarification_count,
             "clarification_question": "",
             "needs_user_input": False,
             "parsed_query": {},
@@ -171,7 +167,6 @@ class FinanceAgent:
                 "session_id": session_id,
                 "sql_query": result.get("sql_query", ""),
                 "sql_attempts": result.get("sql_attempts", 0),
-                "clarification_count": result.get("clarification_count", clarification_count)
             }
             
         except Exception as e:
@@ -182,7 +177,6 @@ class FinanceAgent:
                 "session_id": session_id,
                 "sql_query": "",
                 "sql_attempts": 0,
-                "clarification_count": clarification_count
             }
 
 class FinanceAgentInterface:
@@ -213,7 +207,6 @@ class FinanceAgentInterface:
                 result = self.framework.process_query(
                     user_input,
                     self.current_session_id,
-                    clarification_count=clarification_count
                 )
                 self.current_session_id = result["session_id"]
                 
@@ -224,15 +217,15 @@ class FinanceAgentInterface:
                 # Clarification 필요 시
                 if result.get("needs_user_input", False):
                     if clarification_count < 2:
-                        clarification = input("🤖: 추가 정보를 입력해주세요: ").strip()
+                        clarification = input("추가 정보를 입력해주세요: ").strip()
                         if clarification:
                             clarification_count += 1  # 카운트 증가
-                            clarified_result = self.framework.process_query(
+                            # print(clarification_count)
+                            result = self.framework.process_query(
                                 f"사용자 질문: {user_input}, 추가 정보: {clarification}",
                                 session_id=self.current_session_id,
-                                clarification_count=clarification_count
                             )
-                            print(f"🤖: {clarified_result['response']}")
+                            print(f"🤖: {result['response']}")
                         else:
                             print("🤖: 추가 정보가 없어 대화를 종료합니다.")
                             break

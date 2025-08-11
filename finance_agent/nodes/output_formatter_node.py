@@ -51,7 +51,7 @@ class OutputFormatterNode:
 
         ticker_to_name = {}
         if "ticker" in columns:
-            ticker_to_name = {row["ticker"]: row["회사명"] for _, row in self.company_df.iterrows()}
+            ticker_to_name = {row["ticker"]: row["company_name"] for _, row in self.company_df.iterrows()}
 
         output_lines = []
         for i, row in enumerate(results, start=1):

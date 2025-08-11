@@ -1,4 +1,4 @@
-/tests
+tests/
 test.py
 
 
@@ -127,7 +127,7 @@ Thumbs.db
 *.swo
 
 # Data files
-*.csv
+# *.csv
 *.json
 *.xlsx
 *.parquet

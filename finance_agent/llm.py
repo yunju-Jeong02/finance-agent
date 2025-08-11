@@ -6,7 +6,7 @@ from langchain.schema import BaseOutputParser
 from config.config import Config
 
 class LLM:
-    def __init__(self, model_type="Hyperclova", model_name="HCX-005", temperature=0.1):
+    def __init__(self, model_type="OpenAI", model_name="gpt-4o-mini", temperature=0.1):
         self.config = Config()
         self.model_type = model_type
         self.model_name = model_name

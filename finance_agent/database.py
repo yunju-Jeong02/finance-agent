@@ -61,7 +61,7 @@ class DatabaseManager:
             return formatted_results
             
         except Exception as e:
-            print(f"Error executing query: {e}")
+            # print(f"Error executing query: {e}")
             raise e
         finally:
             cursor.close()

@@ -25,6 +25,7 @@ class QueryParserNode:
         return ticker_row['ticker'].values[0] if not ticker_row.empty else None
 
     def process(self, state: Dict) -> Dict:
+        state["needs_user_input"] = False
         user_query = state.get("user_query", "")
         try:
             response = self.llm.run(prompt.format(user_query=user_query))

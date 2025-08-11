@@ -1,6 +1,6 @@
-/api
-scripts/deploy_ngrok.py
-scripts/run_api.py
+/tests
+test.py
+
 
 # Python
 __pycache__/

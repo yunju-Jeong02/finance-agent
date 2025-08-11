@@ -140,6 +140,7 @@ class FinanceAgent:
         if session_id is None:
             session_id = str(uuid.uuid4())
         
+        
         initial_state = {
             "user_query": user_query,
             "session_id": session_id,
@@ -156,7 +157,11 @@ class FinanceAgent:
         }
         
         try:
+            # print('[FinanceAgent] Initial_state:', initial_state)  # 디버깅용
+            
+            # Process the initial state through the graph
             result = self.graph.invoke(initial_state)
+
             # print(f"[FinanceAgent] Processed state: {result}")  # 디버깅용
             
             return {
@@ -220,12 +225,14 @@ class FinanceAgentInterface:
                         clarification = input("추가 정보를 입력해주세요: ").strip()
                         if clarification:
                             clarification_count += 1  # 카운트 증가
+                            clarification_question = result.get("clarification_question", "")
                             # print(clarification_count)
                             result = self.framework.process_query(
-                                f"사용자 질문: {user_input}, 추가 정보: {clarification}",
+                                user_query=f"사용자 요청: {user_input} \n 추가 질문: {clarification_question} \n 추가 질문에 대한 사용자 응답: {clarification}",
                                 session_id=self.current_session_id,
                             )
-                            print(f"🤖: {result['response']}")
+                            response = result['response'] if result['response'] else result.get("clarification_question")
+                            print(f"🤖: {response}")
                         else:
                             print("🤖: 추가 정보가 없어 대화를 종료합니다.")
                             break
@@ -233,6 +240,8 @@ class FinanceAgentInterface:
                         # 이미 2회 요청했으면 종료
                         print("🤖: 정보가 부족하여 질문을 이해하지 못했습니다. 다시 질문해 주세요.")
                         break
+                else:
+                    clarification_count = 0  # 성공적으로 처리되면 카운트 초기화
 
                 # Debug info
                 if result.get("sql_query"):

@@ -131,5 +131,5 @@ Thumbs.db
 *.json
 *.xlsx
 *.parquet
-data/
+# data/
 logs/

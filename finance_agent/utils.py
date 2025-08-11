@@ -34,7 +34,7 @@ def extract_date(query: str) -> str:
 
     # MM-DD or MM월DD일 (연도는 현재 연도)
     current_year = str(datetime.now().year)
-    md = re.search(r'(\d{1,2})[월\s./-](\d{1,2})일?', query)
+    md = re.search(r'(\d{1,2})\s*월\s*(\d{1,2})\s*일?', query)
     if md:
         m, d = md.groups()
         date = f"{current_year}-{m.zfill(2)}-{d.zfill(2)}"

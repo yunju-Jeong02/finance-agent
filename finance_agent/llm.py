@@ -12,6 +12,9 @@ class LLM:
         self.llm = self._init_llm()
 
     def _init_llm(self):
+        self._clova_host = self.config.CLOVA_HOST
+        self._hyperclova_host = "https://" + self.config.CLOVA_HOST
+        self._model_endpoint = "/v3/chat-completions/HCX-005"
         return ChatClovaX(
             model=self.model_name,
             temperature=self.temperature,
@@ -29,3 +32,4 @@ class LLM:
 
     def get_llm(self):
         return self.llm
+

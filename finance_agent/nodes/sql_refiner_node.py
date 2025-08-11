@@ -1,5 +1,5 @@
 """
-SQL Refiner Node : CM
+SQL Refiner Node
 Refines SQL queries when they fail (max 3 attempts)
 """
 

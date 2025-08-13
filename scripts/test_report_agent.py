@@ -27,8 +27,8 @@ class DemoNewsBot(NewsBot):
             company_name=company_name
         ).tag(session_id, company_name, 'daily')
         
-        # ✨ 주간 보고서 스케줄만 '1분'으로 변경하여 테스트
-        self.scheduler.every(1).minute.do(
+        # ✨ 주간 보고서 스케줄만 '5분'으로 변경하여 테스트
+        self.scheduler.every(5).minute.do(
             self._send_weekly_report, 
             session_id=session_id, 
             company_name=company_name

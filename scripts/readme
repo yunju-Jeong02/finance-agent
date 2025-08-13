@@ -1,1 +1,2 @@
-
+python scripts/test_report_agent.py
+-> 테스트를 위해 5분마다로 스케줄링해놓은 test_agent

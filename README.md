@@ -24,3 +24,15 @@ python scripts/run_agent.py
 # 스케줄링 실행
 뉴스 스케줄링 입력
 ```
+
+## 웹 데모
+```bash
+conda activate finance-agent
+pip install streamlit
+```
+이후 email어쩌고 나오면 암것도 없이 enter해주면 됩니다
+
+```bash
+streamlit run web_demo.py
+```
+끝!

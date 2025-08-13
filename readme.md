@@ -30,7 +30,7 @@ python scripts/run_daily_update.py --mode daily
 
 # 매일 뉴스 데이터 업데이트
 python scripts/run_news_daily_update.py
-
+```
 
 ## 📁 프로젝트 구조
 

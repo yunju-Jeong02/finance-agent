@@ -21,7 +21,11 @@ class AgentController:
 
     def run(self):
         print("=== KU-gent v2.6 (Stable) ===")
-        print("'뉴스 스케줄링', '스케줄 취소', '스케줄 확인'이라고 말씀해보세요. '종료' 입력 시 종료됩니다.\n")
+        print("KUGENT DEMO는 금융 분석과 뉴스 스케줄링을 도와주는 AI 에이전트입니다. 주가 관련 Q&A, 최신 뉴스 요약, 주간 보고서 생성 등의 기능이 있습니다.")
+        print("주가 요약 Q&A 예시 : 7월 3일 삼성전자 종가를 말해줘")
+        print("뉴스 요약 예시 : 8월 2일 SK하이닉스 뉴스를 요약해줘")
+        print("주간 보고서 요약 : '뉴스 스케줄링', '스케줄 취소', '스케줄 확인'이라고 말씀해보세요.")
+        print("'quit' 또는 '종료' 입력 시 종료됩니다.\n")
 
         scheduler_thread = threading.Thread(target=self.news_bot.run_scheduler, daemon=True)
         scheduler_thread.start()

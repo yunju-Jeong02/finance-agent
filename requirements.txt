@@ -37,4 +37,4 @@ pytest-asyncio==0.21.1
 beautifulsoup4==4.12.3
 selenium==4.21.0
 
-streamlit
+streamlit==1.48.0

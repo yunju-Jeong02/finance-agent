@@ -39,24 +39,18 @@ articles.append({
                     "date": "20250704",
                     "content": content,
                 })
-## 실시간 요약에서는 date : 오늘날짜 (이외 동작 동일)
+- 실시간 요약에서는 date : 오늘날짜 (이외 동작 동일)
 
 
 ## Hot News 요약
 User input : 핫한 뉴스 요약해줘
+output
 top_5_keywords = ["삼성전자", "AI", "2분기", "실적", "한화시스템"]
-df = self.news_db.get_recent_news_titles(limit=100)
+article : 
+"삼성전자...AI 시장 활성화..."
+"삼성전자 실적.... 상승.."
+"삼성전자, 한화시스템 주가 하락"
 
-for _, row in df.iterrows():
-    matched_keywords = [kw for kw in top_5_keywords if kw in row['title']]
-    if len(matched_keywords) >= 2:
-        # 일치하는 키워드 수와 가장 상위의 키워드 인덱스로 우선순위 점수 부여
-        score = len(matched_keywords) * 100 - min([top_5_keywords.index(kw) for kw in matched_keywords])
-        candidate_news.append({"score": score, "item": row.to_dict()})
-
-# 점수 순으로 정렬
-candidate_news.sort(key=lambda x: x['score'], reverse=True)
-selected_news = [item['item'] for item in candidate_news]
 
 
 

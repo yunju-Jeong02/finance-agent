@@ -1,22 +1,18 @@
 ##  url 요약
 User input : https://www.newsis.com/view/NISX20250814_0003290136 요약해줘
-state["parsed_query"] = {
-                "intent": intent,
-                "date": None,               # URL엔 날짜 불필요
-                "keywords": ["https://www.newsis.com/view/NISX20250814_0003290136"],          # 원본 URL 그대로
-                "company_name": "",
-                "market": ""
-            }
+output
+"intent" : "url_summary_request"
+"date": None,
+"keywords": ["https://www.newsis.com/view/NISX20250814_0003290136"],        
+
 
 ## DB 뉴스 검색
 User input : 삼성전자 7월 4일 뉴스 요약해줘
-state["parsed_query"] = {
-                "intent": intent,
-                "date": 2025-07-04,
-                "keywords": "삼성전자",
-                "company_name": "",
-                "market": ""
-            }
+output
+"intent" : "news_summary_request"
+"date": 2025-07-04,
+"keywords": "삼성전자"
+
 query = text(f"""
             SELECT DISTINCT title, link, date, NULL as content
             FROM News WHERE ticker=="005930.KS" and date =="20250704"
@@ -27,18 +23,12 @@ query = text(f"""
 ## DB 검색 실패 시 크롤링
 User input : 삼성전자 7월 4일 뉴스 요약해줘
 url = (
-                f"https://search.naver.com/search.naver"
-                f"?where=news&query={삼성전자}&sm=tab_opt&sort=0"
-                f"&ds={ds}&de={de}&nso=so%3Ar%2Cp%3Afrom{20250704}to{20250704}"
+f"https://search.naver.com/search.naver"
+f"?where=news&query={삼성전자}&sm=tab_opt&sort=0"
+f"&ds={ds}&de={de}&nso=so%3Ar%2Cp%3Afrom{20250704}to{20250704}"
             )
 elements = driver.find_elements(By.XPATH, '//span[contains(@class, "sds-comps-text-type-headline1")]/parent::a')
 
-articles.append({
-                    "title": title,
-                    "link": href,
-                    "date": "20250704",
-                    "content": content,
-                })
 - 실시간 요약에서는 date : 오늘날짜 (이외 동작 동일)
 
 
